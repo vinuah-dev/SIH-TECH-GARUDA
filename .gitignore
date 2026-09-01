@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Model weights download on first run, not committed.
+models/*.pt
+
+# Runtime output
+data/events/*.jsonl
+data/evidence/*.jpg
+data/evidence/*.mp4
+data/*.db
+
+# Generated demo assets
+data/samples/bus.jpg
+data/samples/border_demo.mp4
+# Training datasets - large, not committed.
+data/datasets/

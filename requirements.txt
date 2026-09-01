@@ -1,0 +1,35 @@
+# IBVAP runtime dependencies (Python 3.10+)
+
+# --- core: detection, tracking, video -----------------------------------
+ultralytics>=8.3,<9          # YOLOv8 person and vehicle detection
+opencv-python>=4.8           # ingestion, annotation, evidence stills and clips
+numpy>=1.26                  # frame buffers
+
+# torch arrives as an ultralytics dependency. On a machine with no GPU,
+# install the much smaller CPU wheel first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# --- dashboard and API (serve.py) ---------------------------------------
+fastapi>=0.110               # REST endpoints and the WebSocket alert feed
+uvicorn>=0.27                # ASGI server
+websockets>=12.0             # WebSocket transport
+
+# --- ANPR ----------------------------------------------------------------
+# Optional. Without either of these IBVAP still locates plates and saves the
+# crop as evidence; it simply cannot read the number. First use downloads
+# model weights.
+#
+# PaddleOCR is the default and was measured far better on real Indian plates -
+# 73.2% of plates read exactly against EasyOCR's 34.5%, and faster with it
+# (0.22s a plate against 0.56s), because only its recogniser is used and the
+# plate is already located. See app/anpr/readers.py.
+paddlepaddle>=3.0
+paddleocr>=3.0
+
+# Fallback recogniser, used automatically when PaddleOCR will not load.
+easyocr>=1.7
+
+# --- optional ------------------------------------------------------------
+# Only needed for --tracker bytetrack. The default --tracker iou is
+# implemented in app/detection/tracker.py and needs nothing extra.
+# lap>=0.5

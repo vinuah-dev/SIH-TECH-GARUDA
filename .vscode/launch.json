@@ -1,0 +1,141 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "IBVAP: synthetic demo (no model needed)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--source",
+        "synthetic",
+        "--detector",
+        "sim",
+        "--force-night"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: loitering escalation (2 alerts)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--source",
+        "synthetic",
+        "--detector",
+        "sim",
+        "--synthetic-frames",
+        "360",
+        "--linger",
+        "--force-night"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: camera tampering",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--source",
+        "synthetic",
+        "--detector",
+        "sim",
+        "--tamper",
+        "--force-night"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: demo video (real YOLO)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--source",
+        "data/samples/border_demo.mp4",
+        "--force-night"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: vehicles + ANPR + registry",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--source",
+        "data/samples/border_demo.mp4",
+        "--detect",
+        "all",
+        "--registry",
+        "config/vehicle-registry.json",
+        "--force-night",
+        "--db"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: calibrated camera (metres)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--source",
+        "synthetic",
+        "--detector",
+        "sim",
+        "--zones",
+        "config/zones-calibrated.json",
+        "--force-night"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: webcam + live view",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--source",
+        "webcam:0",
+        "--view",
+        "--force-night"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: whole fleet",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": [
+        "--cameras",
+        "config/cameras.json",
+        "--view",
+        "--db"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "IBVAP: dashboard server",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/serve.py",
+      "args": [
+        "--view"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

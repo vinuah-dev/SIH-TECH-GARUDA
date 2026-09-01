@@ -1,0 +1,29 @@
+{
+  "camera_id": "CAM-GATE",
+  "_comment": "A vehicle checkpoint. The lane exists to admit trucks, so only a person standing in it is an intrusion. The verge beside it is the opposite: pedestrians belong there, a vehicle does not.",
+  "zones": [
+    {
+      "name": "VEHICLE-LANE",
+      "kind": "RESTRICTED",
+      "base_risk": 60,
+      "objects": ["PERSON"],
+      "description": "Vehicle lane - no pedestrians",
+      "polygon": [[0.35, 0.45], [0.75, 0.45], [0.90, 1.00], [0.20, 1.00]]
+    },
+    {
+      "name": "VERGE",
+      "kind": "RESTRICTED",
+      "base_risk": 55,
+      "objects": ["VEHICLE"],
+      "description": "Pedestrian verge - no vehicles",
+      "polygon": [[0.75, 0.45], [1.00, 0.45], [1.00, 1.00], [0.90, 1.00]]
+    },
+    {
+      "name": "APPROACH",
+      "kind": "WATCH",
+      "base_risk": 30,
+      "description": "Approach to the checkpoint, watched for everything",
+      "polygon": [[0.30, 0.30], [0.85, 0.30], [0.85, 0.45], [0.30, 0.45]]
+    }
+  ]
+}

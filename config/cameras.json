@@ -1,0 +1,47 @@
+{
+  "_comment": "Two cameras in one process. Each has its own virtual fence, because a low laptop camera and a high phone camera see completely different geometry. Plain YOLO is stateless, so the model loads once and both feeds share it. A camera that is not answering is skipped at startup rather than stalling the fleet.",
+  "_location_note": "'location' is optional and only feeds the map - a camera without one runs identically. lat/lon are WGS84 degrees. 'bearing' is the compass direction the camera faces and 'fov' its horizontal field of view; together they draw a wedge on the map showing which way it points. That wedge is a claim about aim, NOT measured coverage - a ridge or a parked truck takes most of it away. Leave bearing out rather than guessing it. The coordinates below are placeholders for a development machine, not a real post.",
+  "cameras": [
+    {
+      "camera_id": "CAM-01",
+      "source": "webcam:0",
+      "zones": "config/zones-cam01.json",
+      "_note": "laptop camera",
+      "location": {
+        "lat": 28.613939,
+        "lon": 77.209023,
+        "bearing": 90,
+        "fov": 60,
+        "height_m": 1.2,
+        "site": "Gate A"
+      }
+    },
+    {
+      "camera_id": "CAM-PHONE",
+      "source": "http://172.16.148.165:8080/video",
+      "zones": "config/zones-phone.json",
+      "_note": "IP Webcam app on the phone - update the IP if it changes",
+      "reconnect_attempts": 5,
+      "location": {
+        "lat": 28.614512,
+        "lon": 77.209870,
+        "site": "Checkpost 1",
+        "_note": "no bearing surveyed yet, so the map draws a pin and no wedge"
+      }
+    }
+  ],
+  "_geofence_note": "Areas drawn on the map, in lat/lon. These are NOT the virtual fences in config/zones-*.json - those live in frame coordinates and cannot be placed on a map without a surveyed homography per camera. Nothing in the running pipeline tests detections against these yet; they group cameras by sector and give the map areas to draw.",
+  "geofences": [
+    {
+      "name": "SECTOR-7",
+      "kind": "SECTOR",
+      "description": "Placeholder sector covering both development cameras",
+      "polygon": [
+        [28.6100, 77.2050],
+        [28.6180, 77.2050],
+        [28.6180, 77.2130],
+        [28.6100, 77.2130]
+      ]
+    }
+  ]
+}

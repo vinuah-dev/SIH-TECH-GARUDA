@@ -1,0 +1,30 @@
+{
+  "camera_id": "CAM-01",
+  "_comment": "Same fences as zones.json, plus a ground-plane calibration. ILLUSTRATIVE ONLY: these four correspondences were chosen to give the bundled demo clip plausible metric behaviour, NOT surveyed from a real camera. For a real deployment, mark four points on the ground whose real positions you have measured, note where they appear in the camera image, and put those pairs here.",
+  "calibration": {
+    "unit": "m",
+    "_comment": "image = normalized 0-1 frame position of a known ground point. world = its real position in metres: X across the scene, Y distance from the camera.",
+    "points": [
+      { "image": [0.10, 0.56], "world": [0.0, 40.0] },
+      { "image": [0.95, 0.56], "world": [12.0, 40.0] },
+      { "image": [1.00, 0.99], "world": [12.0, 6.0] },
+      { "image": [0.05, 0.99], "world": [0.0, 6.0] }
+    ]
+  },
+  "zones": [
+    {
+      "name": "RESTRICTED",
+      "kind": "RESTRICTED",
+      "base_risk": 60,
+      "description": "No-entry strip along the border fence line",
+      "polygon": [[0.55, 0.30], [1.00, 0.30], [1.00, 1.00], [0.55, 1.00]]
+    },
+    {
+      "name": "WATCH",
+      "kind": "WATCH",
+      "base_risk": 30,
+      "description": "Buffer approach corridor",
+      "polygon": [[0.30, 0.30], [0.55, 0.30], [0.55, 1.00], [0.30, 1.00]]
+    }
+  ]
+}

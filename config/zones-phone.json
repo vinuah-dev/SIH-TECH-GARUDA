@@ -1,0 +1,20 @@
+{
+  "camera_id": "CAM-PHONE",
+  "_comment": "Phone camera, mounted higher and looking down the room. The fence is the far end, so it starts below the ceiling line rather than at the top of the frame.",
+  "zones": [
+    {
+      "name": "RESTRICTED",
+      "kind": "RESTRICTED",
+      "base_risk": 60,
+      "description": "Far end of the room, past the boundary line",
+      "polygon": [[0.55, 0.32], [1.00, 0.32], [1.00, 1.00], [0.55, 1.00]]
+    },
+    {
+      "name": "WATCH",
+      "kind": "WATCH",
+      "base_risk": 30,
+      "description": "Middle of the room, approaching the far end",
+      "polygon": [[0.28, 0.32], [0.55, 0.32], [0.55, 1.00], [0.28, 1.00]]
+    }
+  ]
+}

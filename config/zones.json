@@ -1,0 +1,20 @@
+{
+  "camera_id": "CAM-01",
+  "_comment": "Polygons use NORMALIZED coordinates (0.0-1.0) so the same fence works at any resolution. A detection is tested at the person's ground point (bottom-centre of the box), not the box centre.",
+  "zones": [
+    {
+      "name": "RESTRICTED",
+      "kind": "RESTRICTED",
+      "base_risk": 60,
+      "description": "No-entry strip along the border fence line",
+      "polygon": [[0.55, 0.30], [1.00, 0.30], [1.00, 1.00], [0.55, 1.00]]
+    },
+    {
+      "name": "WATCH",
+      "kind": "WATCH",
+      "base_risk": 30,
+      "description": "Buffer approach corridor",
+      "polygon": [[0.30, 0.30], [0.55, 0.30], [0.55, 1.00], [0.30, 1.00]]
+    }
+  ]
+}
