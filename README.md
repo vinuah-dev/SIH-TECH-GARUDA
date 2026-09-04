@@ -1,4 +1,4 @@
-# IBVAP — Intelligent Border Video Analytics Platform
+# SANTINEL-X — Intelligent Border Surveillance & Security System
 
 **SIH 2026 · Problem Statement 26187**
 Ministry of Home Affairs · Sashastra Seema Bal (SSB), Police II Division
