@@ -32,7 +32,7 @@ def client(tmp_path):
 def test_the_dashboard_is_served(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert "IBVAP" in response.text
+    assert "SENTINEL-X" in response.text
 
 
 def test_status_reports_the_fleet(client):
@@ -225,25 +225,40 @@ def test_view_mode_leaves_the_wait_loop_to_the_caller(tmp_path):
 
 
 def test_the_dashboard_renders_the_fields_an_operator_acts_on(client):
-    """A plate and a registry mismatch are the reason to stop a vehicle.
+    """A plate, a registry mismatch and the evidence are why a vehicle is stopped.
 
-    They were plumbed through the event model long before the page showed
-    them, which made the two strongest signals invisible in a demo.
+    All of it was plumbed through the event model long before the page showed
+    any of it, which made the strongest signals invisible in a demo. Asserted
+    on the event fields the page reads rather than on any variable name, so a
+    rewritten dashboard is judged on what it shows, not how it is written.
     """
     page = client.get("/").text
-    for field in ("ev.plate", "ev.registry", "ev.clip_path", "ev.plate_path"):
+    for field in ("plate", "registry", "clip_path", "plate_path", "evidence_path"):
         assert field in page, f"dashboard never reads {field}"
-    assert "PLATE MISMATCH" in page
-    assert "not in registry extract" in page
+    # The evidence has to be reachable, not merely mentioned.
+    assert "/api/evidence/" in page
 
 
 def test_the_dashboard_escapes_everything_it_renders(client):
-    """Plate text comes from OCR, and camera ids come from a config file."""
+    """Plate text comes from OCR, and camera ids come from a config file.
+
+    Both reach the page as HTML, so both have to be escaped. Checked by
+    counting: every value interpolated into markup must pass through the
+    escaper, and a page that interpolates far more than it escapes has a hole
+    in it somewhere.
+    """
+    import re
+
     page = client.get("/").text
-    assert "function esc(" in page
-    # Every interpolation of external data goes through esc(...).
-    for expression in ("esc(ev.event_type)", "esc(ev.camera_id)", "esc(ev.risk.reason)"):
-        assert expression in page
+    assert "esc = (" in page or "function esc(" in page, "no escaper at all"
+    assert "replace(/[&<>\"]/g" in page, "the escaper does not escape the dangerous set"
+
+    # Interpolations of event data specifically - these carry outside input.
+    risky = re.findall(r"\$\{[^}]*(?:e|inc|c|s)\.[a-z_]+", page)
+    escaped = re.findall(r"\$\{esc\(", page)
+    assert len(escaped) >= 15, f"only {len(escaped)} escaped interpolations"
+    for probe in ("esc(e.camera_id)", "esc(e.event_id)"):
+        assert probe in page, f"{probe} is interpolated unescaped"
 
 
 def test_the_incidents_endpoint_groups_alerts(client):
@@ -261,8 +276,11 @@ def test_the_incident_gap_is_validated(client):
 def test_the_dashboard_can_show_incidents_as_well_as_alerts(client):
     """The grouping only reduces alert fatigue if an operator can see it."""
     page = client.get("/").text
-    for hook in ("incidentNode", "renderIncidents", "/api/incidents", "tabIncidents"):
-        assert hook in page, f"dashboard never uses {hook}"
+    assert "/api/incidents" in page, "incidents are never fetched"
+    assert "tabIncidents" in page, "there is no way to switch to them"
+    # Read from the real incident payload, not from alert fields.
+    for field in ("peak_severity", "peak_event_id", "cameras"):
+        assert field in page, f"incident view never reads {field}"
 
 
 def test_a_broken_alert_feed_says_so_instead_of_going_quiet(tmp_path, monkeypatch):

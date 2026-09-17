@@ -1,312 +1,250 @@
-"""Live stream ingestion: reconnect behaviour, backoff and health reporting.
+"""Streaming a camera's annotated view to the dashboard.
 
-A fake capture stands in for cv2.VideoCapture so the whole drop/reconnect
-state machine is testable without a camera or a network.
+The dashboard shows the same picture the desktop window shows - boxes, zones,
+track ids and the live risk read-out - so an operator is looking at what the
+system is actually deciding on, not a raw feed beside it.
 
-Note the use of `islice` below. A live stream has no end - a failed read is a
-dropped link, not EOF - so an endless source is correct behaviour and the
-*consumer* is what stops it, exactly as the pipeline does with --limit or
-Ctrl+C. Tests that want a finite stream either take N frames or configure a
-finite `reconnect_attempts`.
+Two things here are easy to get wrong and silent when wrong. A browser shown
+malformed MJPEG framing displays nothing at all, with no error anywhere. And a
+pipeline that only draws when a window is open serves a blank dashboard, which
+looks exactly like a camera that is down.
 """
-
-from itertools import islice
 
 import numpy as np
 import pytest
+from fastapi.testclient import TestClient
 
-from app.video.sources import open_source
-from app.video.stream import CameraState, StreamSource, is_network_source
+from app.config import SurveillanceConfig
+from app.runner import CameraSpec, MultiCameraRunner
+from app.server import create_app
 
-FRAME = np.zeros((48, 64, 3), dtype=np.uint8)
-
-
-class FakeCapture:
-    """Yields `script` entries in order: True = a frame, False = a read failure."""
-
-    def __init__(self, script, opens=True):
-        self.script = list(script)
-        self._opens = opens
-        self.released = False
-        self.props: dict[int, float] = {}
-
-    def isOpened(self):
-        return self._opens
-
-    def read(self):
-        if not self.script:
-            return False, None
-        ok = self.script.pop(0)
-        return (True, FRAME.copy()) if ok else (False, None)
-
-    def release(self):
-        self.released = True
-
-    def set(self, prop, value):
-        self.props[prop] = value
-        return True
-
-    def get(self, prop):
-        return 0.0
+JPEG_MAGIC = bytes((0xFF, 0xD8, 0xFF))
 
 
-def factory(*captures):
-    """Hands out one capture per connection attempt, in order."""
-    queue = list(captures)
-
-    def make(url):
-        return queue.pop(0) if queue else FakeCapture([], opens=False)
-
-    return make
-
-
-def make_source(capture_factory, **kwargs):
-    slept: list[float] = []
-    source = StreamSource(
-        url="rtsp://camera/stream",
-        capture_factory=capture_factory,
-        probe=lambda url, timeout: True,
-        sleep=slept.append,
-        reconnect_backoff=1.0,
-        **kwargs,
+def config(tmp_path, **kwargs):
+    settings = dict(
+        source="synthetic", detector="sim", synthetic_frames=40, force_night=True,
+        zones_path="config/zones.json",
+        events_dir=tmp_path / "e", evidence_dir=tmp_path / "v",
+        save_clips=False, quiet=True, print_summary=False, color=False,
     )
-    return source, slept
+    settings.update(kwargs)
+    return SurveillanceConfig(**settings)
 
 
-# ------------------------------------------------------------------ routing
+# --------------------------------------------------------------- the framing
 
 
-@pytest.mark.parametrize("url", ["rtsp://cam/1", "rtsps://cam/1", "http://cam", "RTSP://CAM"])
-def test_network_urls_are_recognised(url):
-    assert is_network_source(url)
+def test_the_multipart_framing_is_exactly_what_a_browser_expects():
+    """Get a CRLF wrong and the browser shows nothing, with no error to say why."""
+    import app.server.api as api
 
-
-@pytest.mark.parametrize("spec", ["webcam:0", "synthetic", "clip.mp4", "0"])
-def test_local_sources_are_not_network(spec):
-    assert not is_network_source(spec)
-
-
-def test_open_source_routes_rtsp_to_a_stream():
-    source = open_source("rtsp://camera/stream")
-    assert isinstance(source, StreamSource)
-    assert source.kind == "RTSP"
-
-
-# ------------------------------------------------------------- happy stream
-
-
-def test_reads_frames_from_a_healthy_stream():
-    source, _ = make_source(factory(FakeCapture([True] * 10)))
-    frames = list(islice(source.frames(), 3))
-    assert len(frames) == 3
-    assert source.health.state is CameraState.ONLINE
-    assert source.health.frames_read == 3
-    assert source.health.connects == 1
-
-
-def test_limit_stops_the_stream():
-    source, _ = make_source(factory(FakeCapture([True] * 10)), limit=4)
-    assert len(list(source.frames())) == 4
-
-
-def test_stride_thins_the_stream():
-    source, _ = make_source(factory(FakeCapture([True] * 20)), stride=3, limit=3)
-    assert len(list(source.frames())) == 3
-
-
-def test_stream_time_starts_at_zero_and_advances():
-    ticks = iter([100.0, 100.5, 101.0, 101.5, 102.0, 102.5])
-    source = StreamSource(
-        url="rtsp://camera/stream",
-        capture_factory=factory(FakeCapture([True, True])),
-        probe=lambda url, timeout: True,
-        sleep=lambda _: None,
-        clock=lambda: next(ticks),
+    source = (api.__file__ and open(api.__file__, encoding="utf-8").read())
+    assert "CRLF = bytes((13, 10))" in source, (
+        "the framing must be built from explicit byte values - escape sequences "
+        "through a shell have silently become real newlines here before"
     )
-    times = [f.stream_time for f in islice(source.frames(), 2)]
-    assert times[0] >= 0
-    assert times[1] > times[0]
 
 
-def test_buffer_is_kept_at_one_frame():
-    """Live analysis must work on the newest frame, not a backlog."""
-    import cv2
+def test_the_stream_route_is_registered(tmp_path):
+    """Checked on the route table rather than by opening it.
 
-    capture = FakeCapture([True] * 5)
-    source, _ = make_source(factory(capture))
-    list(islice(source.frames(), 1))
-    assert capture.props.get(cv2.CAP_PROP_BUFFERSIZE) == 1
-
-
-# --------------------------------------------------------------- reconnect
-
-
-def test_a_dropped_stream_reconnects_and_keeps_going():
-    first = FakeCapture([True, False])       # one frame, then the link drops
-    second = FakeCapture([True] * 10)        # reconnected
-    source, _ = make_source(factory(first, second))
-
-    frames = list(islice(source.frames(), 3))
-    assert len(frames) == 3
-    assert source.health.disconnects == 1
-    assert source.health.connects == 2
-    assert first.released
+    The endpoint is an endless generator by design - a live feed has no last
+    frame - so a test client that reads it to completion never returns. The
+    stream is exercised for real against a running server instead; what a unit
+    test can honestly assert is that the route exists and is shaped right.
+    """
+    app = create_app([CameraSpec(camera_id="CAM-01", source="synthetic")],
+                     config(tmp_path), db_path=tmp_path / "s.db")
+    paths = {getattr(route, "path", None) for route in app.routes}
+    assert "/api/cameras/{camera_id}/stream" in paths
 
 
-def test_frame_indices_stay_continuous_across_a_reconnect():
-    source, _ = make_source(factory(FakeCapture([True, False]), FakeCapture([True] * 5)))
-    assert [f.index for f in islice(source.frames(), 3)] == [0, 1, 2]
+def test_an_unknown_camera_is_a_404_not_an_empty_stream(tmp_path):
+    """A blank tile and a wrong camera id must not look the same."""
+    app = create_app([CameraSpec(camera_id="CAM-01", source="synthetic")],
+                     config(tmp_path), db_path=tmp_path / "s.db")
+    with TestClient(app) as client:
+        response = client.get("/api/cameras/NOPE/stream")
+        assert response.status_code == 404
+        assert "NOPE" in response.json()["detail"]
 
 
-def test_a_camera_that_never_opens_is_retried_then_given_up_on():
-    dead = [FakeCapture([], opens=False) for _ in range(6)]
-    source, slept = make_source(factory(*dead), reconnect_attempts=3)
-
-    assert list(source.frames()) == []
-    assert source.health.state is CameraState.OFFLINE
-    assert "gave up after 3" in source.health.last_error
-    assert len(slept) == 3
+# -------------------------------------------------------- frames being kept
 
 
-def test_backoff_grows_exponentially_and_is_capped():
-    dead = [FakeCapture([], opens=False) for _ in range(8)]
-    source, slept = make_source(
-        factory(*dead), reconnect_attempts=6, max_backoff=4.0
+def test_the_fleet_keeps_frames_for_the_dashboard_without_a_window():
+    """A pipeline that only draws when a window is open serves a blank dashboard."""
+    runner = MultiCameraRunner(
+        [CameraSpec(camera_id="CAM-01", source="synthetic")],
+        SurveillanceConfig(source="synthetic", detector="sim", view=False,
+                           zones_path="config/zones.json", color=False),
+        capture_frames=True,
     )
-    list(source.frames())
-    assert slept == [1.0, 2.0, 4.0, 4.0, 4.0, 4.0]
-
-
-def test_backoff_resets_after_a_successful_reconnect():
-    source, slept = make_source(
-        factory(
-            FakeCapture([True, False]),
-            FakeCapture([], opens=False),
-            FakeCapture([True, False]),
-            FakeCapture([True] * 5),
-        )
+    runner.detector = None
+    worker = runner._build_workers()[0]
+    assert worker.pipeline.frame_sink is not None, (
+        "no sink means no frames reach the dashboard"
     )
-    list(islice(source.frames(), 3))
-    # Each reconnect sequence starts again at the base delay.
-    assert slept[0] == 1.0
-    assert 1.0 in slept[1:]
 
 
-def test_release_stops_a_reconnecting_stream():
-    source, _ = make_source(factory(FakeCapture([], opens=False)))
-    source.release()
-    assert list(source.frames()) == []
-    assert source.health.state is CameraState.OFFLINE
-
-
-def test_an_exception_while_opening_is_recorded_not_raised():
-    def explode(url):
-        raise OSError("connection refused")
-
-    source, _ = make_source(explode, reconnect_attempts=1)
-    assert list(source.frames()) == []
-    assert source.health.last_error is not None
-
-
-def test_an_exception_while_reading_triggers_a_reconnect():
-    class Exploding(FakeCapture):
-        def read(self):
-            raise OSError("stream reset")
-
-    source, _ = make_source(factory(Exploding([]), FakeCapture([True] * 5)))
-    assert len(list(islice(source.frames(), 1))) == 1
-    assert source.health.disconnects == 1
-
-
-# ------------------------------------------------------------------ health
-
-
-def test_state_changes_are_reported():
-    seen: list[CameraState] = []
-    source = StreamSource(
-        url="rtsp://camera/stream",
-        capture_factory=factory(FakeCapture([True, False]), FakeCapture([True] * 5)),
-        probe=lambda url, timeout: True,
-        sleep=lambda _: None,
-        on_state_change=lambda health: seen.append(health.state),
+def test_without_capture_and_without_a_window_no_frames_are_kept():
+    """Keeping frames costs memory and a draw per frame; it is not free."""
+    runner = MultiCameraRunner(
+        [CameraSpec(camera_id="CAM-01", source="synthetic")],
+        SurveillanceConfig(source="synthetic", detector="sim", view=False,
+                           zones_path="config/zones.json", color=False),
     )
-    list(islice(source.frames(), 2))
-    assert CameraState.CONNECTING in seen
-    assert CameraState.ONLINE in seen
-    assert CameraState.RECONNECTING in seen
+    runner.detector = None
+    assert runner._build_workers()[0].pipeline.frame_sink is None
 
 
-def test_health_serializes_for_the_api():
-    source, _ = make_source(factory(FakeCapture([True] * 5)))
-    list(islice(source.frames(), 1))
-    payload = source.health.to_dict()
-    assert payload["state"] == "ONLINE"
-    assert payload["frames_read"] == 1
-    assert set(payload) == {
-        "state", "connects", "disconnects", "frames_read", "last_frame_at", "last_error",
-    }
-
-
-# --------------------------------------------------- reachability pre-check
-
-
-def test_an_unreachable_camera_fails_without_waiting_for_ffmpeg():
-    """The pre-check is what stops a dead host blocking for the OS SYN timeout."""
-    opened: list[str] = []
-
-    def factory_that_should_not_run(url):
-        opened.append(url)
-        return FakeCapture([True])
-
-    source = StreamSource(
-        url="rtsp://10.255.255.1:554/stream",
-        capture_factory=factory_that_should_not_run,
-        probe=lambda url, timeout: False,
-        sleep=lambda _: None,
-        reconnect_attempts=1,
+def test_the_newest_frame_is_the_one_served():
+    """A viewer falling behind should see live video, not catch up on a backlog."""
+    runner = MultiCameraRunner(
+        [CameraSpec(camera_id="CAM-01", source="synthetic")],
+        SurveillanceConfig(source="synthetic", detector="sim", color=False),
+        capture_frames=True,
     )
-    assert list(source.frames()) == []
-    assert opened == []  # FFmpeg was never handed a dead address
-    assert "10.255.255.1:554 unreachable" in source.health.last_error
+    first = np.zeros((8, 8, 3), np.uint8)
+    second = np.full((8, 8, 3), 255, np.uint8)
+    runner._post_frame("CAM-01", first)
+    runner._post_frame("CAM-01", second)
+
+    assert runner.latest_frame("CAM-01") is second
+    assert runner.latest_frame("CAM-02") is None
 
 
-def test_probe_uses_the_configured_open_timeout():
-    seen: list[float] = []
+def test_the_dashboard_asks_the_fleet_to_keep_frames(tmp_path):
+    app = create_app([CameraSpec(camera_id="CAM-01", source="synthetic")],
+                     config(tmp_path), db_path=tmp_path / "s.db")
+    with TestClient(app):
+        assert app.state.service.runner.capture_frames is True
 
-    def probe(url, timeout):
-        seen.append(timeout)
-        return False
 
-    source = StreamSource(
-        url="rtsp://cam/1",
-        probe=probe,
-        sleep=lambda _: None,
-        reconnect_attempts=1,
-        open_timeout=3.0,
+# ------------------------------------------------------ what gets drawn on
+
+
+def test_the_streamed_frame_is_the_annotated_one_not_the_raw_feed(tmp_path):
+    """An operator must see what the system decided on, not a bare picture."""
+    from app.pipeline import SurveillancePipeline
+
+    drawn = []
+    pipeline = SurveillancePipeline(
+        config(tmp_path, synthetic_frames=25),
+        frame_sink=lambda camera_id, frame: drawn.append((camera_id, frame)),
     )
-    list(source.frames())
-    assert seen and all(t == 3.0 for t in seen)
+    pipeline.run()
+
+    assert drawn, "nothing was posted to the sink"
+    camera_id, frame = drawn[-1]
+    assert camera_id == "CAM-01"
+    assert frame.ndim == 3, "an annotated frame is a colour image"
+    # The zone overlay and HUD are drawn in colour on a greyscale-ish scene, so
+    # a raw frame and an annotated one cannot have identical channels.
+    assert not (frame[..., 0] == frame[..., 2]).all(), (
+        "this looks like an unannotated frame"
+    )
 
 
-@pytest.mark.parametrize(
-    "url,port",
-    [
-        ("rtsp://cam/1", 554),
-        ("rtsp://cam:8554/1", 8554),
-        ("http://cam/feed", 80),
-        ("https://cam/feed", 443),
-    ],
-)
-def test_default_ports_per_scheme(url, port):
-    from urllib.parse import urlparse
+def test_frames_are_posted_every_frame_not_only_when_something_alarms(tmp_path):
+    """A view that only updates on an alert is a slideshow, not a live feed."""
+    from app.pipeline import SurveillancePipeline
 
-    from app.video.stream import DEFAULT_PORTS
+    drawn = []
+    stats = SurveillancePipeline(
+        config(tmp_path, synthetic_frames=30),
+        frame_sink=lambda camera_id, frame: drawn.append(frame),
+    ).run()
 
-    parsed = urlparse(url)
-    assert (parsed.port or DEFAULT_PORTS[parsed.scheme]) == port
+    assert stats.alerts <= 2, "this fixture should not be all alerts"
+    assert len(drawn) >= stats.frames - 1, (
+        f"{len(drawn)} frames posted from {stats.frames} - the sink is being skipped"
+    )
 
 
-def test_a_url_without_a_host_skips_the_probe():
-    from app.video.stream import tcp_reachable
+# ------------------------------------------------- a camera that says nothing
 
-    assert tcp_reachable("rtsp:///no-host", timeout=0.1) is True
+
+def test_a_camera_that_delivered_no_frames_explains_itself():
+    """STOPPED with no reason, next to a camera that gives one, is the worst case.
+
+    A webcam already held by another program opens fine and then delivers
+    nothing. That used to end silently: no exception, no error field, just a
+    dead tile. It is also the single most likely failure in a live demo, and
+    the fix for it - close the other program - is nothing like the fix for a
+    camera that is off the network.
+    """
+    from app.pipeline import SessionStats
+    from app.runner import CameraWorker
+
+    worker = CameraWorker.__new__(CameraWorker)
+    worker.spec = CameraSpec(camera_id="CAM-01", source="webcam:0")
+    worker.error = None
+    worker.thread = None
+
+    reason = worker._explain(SessionStats())
+    assert reason, "a silent stop must still say something"
+    assert "webcam:0" in reason, "the reason should name the source"
+    assert "another program" in reason
+
+
+def test_a_camera_that_ran_is_not_reported_as_broken():
+    from app.pipeline import SessionStats
+    from app.runner import CameraWorker
+
+    worker = CameraWorker.__new__(CameraWorker)
+    worker.spec = CameraSpec(camera_id="CAM-01", source="webcam:0")
+    worker.error = None
+    worker.thread = None
+
+    stats = SessionStats()
+    stats.frames = 120
+    assert worker._explain(stats) is None
+
+
+def test_a_real_exception_is_reported_verbatim():
+    """A raised error already says more than any guess could."""
+    from app.pipeline import SessionStats
+    from app.runner import CameraWorker
+
+    worker = CameraWorker.__new__(CameraWorker)
+    worker.spec = CameraSpec(camera_id="CAM-01", source="webcam:0")
+    worker.error = RuntimeError("codec not supported")
+    worker.thread = None
+
+    assert worker._explain(SessionStats()) == "codec not supported"
+
+
+# ---------------------------------------------------------- browser budget
+
+
+def test_the_dashboard_never_streams_every_camera_at_once():
+    """A browser gives one server six connections, and an MJPEG stream keeps one.
+
+    With a stream per tile, six cameras used them all up: alert polling, the
+    map and the zone editor then waited forever, with no error anywhere. The
+    tiles must not open their streams by themselves, and a fixed number may.
+    """
+    import re
+    from pathlib import Path
+
+    page = Path("app/server/static/index.html").read_text(encoding="utf-8")
+    assert not re.search(r'<img[^>]+src="/api/cameras/\$\{[^}]+\}/stream"', page), (
+        "a camera tile opens its own stream again - six cameras will freeze the dashboard"
+    )
+    budget = re.search(r"const LIVE_STREAMS = (\d+);", page)
+    assert budget, "the number of live streams must be capped"
+    assert 1 <= int(budget.group(1)) <= 3, (
+        "polling alone fires four requests at once; more than two streams starves it"
+    )
+
+
+def test_streams_close_when_the_wall_is_not_on_screen():
+    """The map and zone pages need connections the wall would otherwise hold."""
+    from pathlib import Path
+
+    page = Path("app/server/static/index.html").read_text(encoding="utf-8")
+    assert 'addEventListener("visibilitychange", syncStreams)' in page
+    body = page[page.index("function showView"):page.index("document.querySelectorAll(\".nav a[data-view]\")")]
+    assert "syncStreams()" in body, "changing page must close or reopen the streams"

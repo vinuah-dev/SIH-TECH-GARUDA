@@ -74,7 +74,7 @@ def draw_hud(
     when = when or datetime.now()
     width = frame.shape[1]
     cv2.rectangle(frame, (0, 0), (width, 30), HUD_BG, -1)
-    left = f"IBVAP | {camera_id} | frame {frame_index} | {fps:.1f} fps"
+    left = f"SENTINEL-X | {camera_id} | frame {frame_index} | {fps:.1f} fps"
     right = f"{when:%Y-%m-%d %H:%M:%S} | ALERTS {alerts}"
     cv2.putText(frame, left, (10, 20), FONT, 0.5, HUD_FG, 1, cv2.LINE_AA)
     (tw, _), _ = cv2.getTextSize(right, FONT, 0.5, 1)

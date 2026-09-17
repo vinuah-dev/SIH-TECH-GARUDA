@@ -315,3 +315,122 @@ def test_half_a_wedge_is_flagged_rather_than_silently_dropped(tmp_path, monkeypa
     # A camera with neither is the normal unsurveyed case and says nothing.
     assert site.locate("CAM-D").coverage_wedge() == []
     assert site.locate("CAM-C").coverage_wedge(), "a complete pair must draw one"
+
+
+# -------------------------------------------------------- 360-degree cameras
+
+
+def test_a_360_camera_draws_a_full_circle_without_a_bearing():
+    """A fisheye or a full-pan PTZ has no single direction to survey."""
+    mast = CameraLocation(28.6139, 77.2090, field_of_view=360, site="Mast")
+    ring = mast.coverage_wedge(reach_m=100)
+    assert len(ring) == 37
+
+    centre = CameraLocation(28.6139, 77.2090)
+    distances = [centre.distance_to(CameraLocation(lat, lon)) for lat, lon in ring]
+    # Every point on the rim: a circle, not a pie slice through the centre.
+    assert min(distances) == pytest.approx(100, rel=0.01)
+    assert max(distances) == pytest.approx(100, rel=0.01)
+
+
+def test_a_360_camera_is_not_mistaken_for_half_a_direction():
+    assert not CameraLocation(28.6, 77.2, field_of_view=360).half_surveyed
+    assert CameraLocation(28.6, 77.2, bearing=90).half_surveyed
+    assert CameraLocation(28.6, 77.2, field_of_view=70).half_surveyed
+    assert not CameraLocation(28.6, 77.2, bearing=90, field_of_view=70).half_surveyed
+
+
+def test_a_360_camera_in_the_fleet_file_raises_no_warning(tmp_path, monkeypatch):
+    from app import ui
+    from app.runner import load_site_map
+
+    said: list[str] = []
+    monkeypatch.setattr(ui, "warn", said.append)
+    path = tmp_path / "fleet.json"
+    path.write_text(json.dumps({"cameras": [
+        {"camera_id": "MAST", "source": "x",
+         "location": {"lat": 28.6, "lon": 77.2, "fov": 360}},
+    ]}), encoding="utf-8")
+
+    site = load_site_map(path)
+    assert site.locate("MAST").coverage_wedge()
+    assert not said, f"a 360-degree camera is not missing a bearing: {said}"
+
+
+# ------------------------------------------------------------------ basemaps
+
+
+def test_the_map_ships_with_imagery_that_draws_no_borders_first():
+    """Satellite first: public street tiles draw international borders their own way."""
+    from app.geo import DEFAULT_BASEMAPS
+
+    payload = SiteMap({"CAM-01": GATE}).to_dict()
+    assert [b["name"] for b in payload["basemaps"]] == [b.name for b in DEFAULT_BASEMAPS]
+    assert payload["basemaps"][0]["name"] == "Satellite"
+    for basemap in payload["basemaps"]:
+        assert all(part in basemap["url"] for part in ("{z}", "{x}", "{y}"))
+        assert basemap["url"].startswith("https://")
+        assert basemap["attribution"], "public tiles must credit their source"
+
+
+def test_a_fleet_file_can_point_the_map_at_its_own_tile_server(tmp_path):
+    """A post with no internet serves tiles inside its own network."""
+    from app.runner import load_site_map
+
+    path = tmp_path / "fleet.json"
+    path.write_text(json.dumps({"cameras": [], "basemaps": [
+        {"name": "Post tiles", "url": "http://10.0.0.5/tiles/{z}/{x}/{y}.png",
+         "attribution": "in-house", "max_zoom": 17},
+    ]}), encoding="utf-8")
+    site = load_site_map(path)
+    assert [b.name for b in site.basemaps] == ["Post tiles"]
+    assert site.basemaps[0].max_zoom == 17
+
+
+def test_an_empty_basemap_list_means_a_grid_and_nothing_fetched(tmp_path):
+    from app.runner import load_site_map
+
+    path = tmp_path / "fleet.json"
+    path.write_text(json.dumps({"cameras": [], "basemaps": []}), encoding="utf-8")
+    assert load_site_map(path).basemaps == ()
+    assert SiteMap(basemaps=()).to_dict()["basemaps"] == []
+
+
+@pytest.mark.parametrize("bad", [
+    {"name": "X", "url": "javascript:alert(1)//{z}/{x}/{y}"},
+    {"name": "X", "url": "//tiles.example/{z}/{x}/{y}.png"},     # another host, disguised
+    {"name": "X", "url": "https://tiles.example/{z}/{x}.png"},   # no {y}
+    {"name": "", "url": "https://tiles.example/{z}/{x}/{y}.png"},
+    {"name": "X", "url": "https://tiles.example/{z}/{x}/{y}.png", "max_zoom": 40},
+    {"name": "X", "url": "https://tiles.example/{z}/{x}/{y}.png", "max_zoom": "deep"},
+    "not an object",
+])
+def test_a_bad_basemap_is_refused_at_load(tmp_path, bad):
+    from app.runner import load_site_map
+
+    path = tmp_path / "fleet.json"
+    path.write_text(json.dumps({"cameras": [], "basemaps": [bad]}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_site_map(path)
+
+
+def test_the_map_endpoint_sends_the_basemaps(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import SurveillanceConfig
+    from app.geo import Basemap
+    from app.runner import CameraSpec
+    from app.server import create_app
+
+    config = SurveillanceConfig(
+        source="synthetic", detector="sim", synthetic_frames=3,
+        zones_path="config/zones.json",
+        events_dir=tmp_path / "e", evidence_dir=tmp_path / "v",
+        save_clips=False, quiet=True, print_summary=False, color=False,
+    )
+    tiles = Basemap("Post tiles", "/tiles/{z}/{x}/{y}.png")
+    app = create_app([CameraSpec(camera_id="CAM-01", source="synthetic", location=GATE)],
+                     config, db_path=tmp_path / "b.db", basemaps=(tiles,))
+    with TestClient(app) as client:
+        names = [b["name"] for b in client.get("/api/map").json()["basemaps"]]
+        assert names == ["Post tiles"]

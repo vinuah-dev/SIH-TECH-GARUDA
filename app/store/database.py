@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from ..alerts.events import IntrusionEvent
+from .integrity import GENESIS, ChainReport, link, verify
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
@@ -41,7 +42,13 @@ CREATE TABLE IF NOT EXISTS events (
     evidence_path TEXT,
     clip_path     TEXT,
     plate         TEXT,
-    payload       TEXT    NOT NULL
+    payload       TEXT    NOT NULL,
+    -- Chain of custody. Each event is hashed together with the hash of the one
+    -- before it, so editing or deleting any past event breaks the link and the
+    -- break points at the row. See app/store/integrity.py.
+    prev_hash     TEXT,
+    hash          TEXT,
+    seq           INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_events_camera    ON events (camera_id, timestamp DESC);
@@ -58,7 +65,7 @@ class EventStore:
     per alert, not per frame - contention is never the bottleneck.
     """
 
-    path: Path = Path("data/ibvap.db")
+    path: Path = Path("data/sentinelx.db")
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -69,7 +76,53 @@ class EventStore:
         self._connection.row_factory = sqlite3.Row
         with self._lock:
             self._connection.executescript(SCHEMA)
+            self._migrate()
             self._connection.commit()
+
+    def _migrate(self) -> None:
+        """Add the chain columns to a database written before they existed.
+
+        Existing rows keep NULL hashes rather than being back-filled. A hash
+        computed today over a row written last month would prove nothing about
+        last month, and a chain that quietly claims to cover events it never
+        saw is worse than one that admits where it starts.
+        """
+        existing = {row[1] for row in self._connection.execute("PRAGMA table_info(events)")}
+        for column, kind in (("prev_hash", "TEXT"), ("hash", "TEXT"), ("seq", "INTEGER")):
+            if column not in existing:
+                self._connection.execute(f"ALTER TABLE events ADD COLUMN {column} {kind}")
+
+    # ------------------------------------------------------ chain of custody
+
+    def _head(self) -> tuple[str, int]:
+        """The newest link in the chain, and the sequence number after it."""
+        row = self._connection.execute(
+            "SELECT hash, seq FROM events WHERE hash IS NOT NULL "
+            "ORDER BY seq DESC LIMIT 1"
+        ).fetchone()
+        if row is None:
+            return GENESIS, 0
+        return row["hash"], int(row["seq"] or 0) + 1
+
+    def head(self) -> str:
+        """The current head hash - the single value that fixes the whole log.
+
+        Publishing this somewhere the holder of this database does not control
+        is what turns a tamper-*evident* log into a chain of custody. Read it
+        out at shift handover, send it to the district server, anchor it on a
+        public chain: any of those work, and none of them happen here.
+        """
+        with self._lock:
+            return self._head()[0]
+
+    def verify_chain(self) -> ChainReport:
+        """Recompute every link and report where, if anywhere, it breaks."""
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT event_id, timestamp, payload, prev_hash, hash FROM events "
+                "ORDER BY seq ASC, timestamp ASC"
+            ).fetchall()
+        return verify(rows)
 
     # ------------------------------------------------------------- writing
 
@@ -99,14 +152,20 @@ class EventStore:
             json.dumps(payload, ensure_ascii=False),
         )
         with self._lock:
+            # The hash covers the JSON exactly as it is about to be stored, so
+            # verification later reads the same bytes an auditor would.
+            previous, seq = self._head()
+            stored_json = row[-1]
+            digest = link(previous, payload["event_id"], payload["timestamp"], stored_json)
             self._connection.execute(
                 """INSERT OR REPLACE INTO events (
                     event_id, timestamp, camera_id, event_type, frame_index,
                     object_label, confidence, track_id, track_label,
                     zone_name, zone_kind, risk_score, severity, reason,
-                    behaviours, evidence_path, clip_path, plate, payload
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                row,
+                    behaviours, evidence_path, clip_path, plate, payload,
+                    prev_hash, hash, seq
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                row + (previous, digest, seq),
             )
             self._connection.commit()
 

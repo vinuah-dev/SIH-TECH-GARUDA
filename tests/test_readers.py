@@ -247,3 +247,73 @@ def test_the_pipeline_hands_its_configured_backend_to_the_engine(tmp_path):
         save_clips=False, color=False, quiet=True, print_summary=False,
     )
     assert SurveillancePipeline(config).anpr.ocr_backend == "easyocr"
+
+
+# ------------------------------- reading a plate vs reading a whole vehicle
+
+
+def test_a_located_plate_and_a_whole_vehicle_use_different_recognisers():
+    """They fail at opposite things, so one reader cannot serve both.
+
+    The default has no text-detection stage: on a plate crop it is the most
+    accurate backend measured, and handed a picture of a bus it cannot find the
+    plate at all. Feeding it the whole vehicle regardless - which this did at
+    first - silently stopped plate reading on any footage where the plate model
+    missed. The demo clip was one, and nothing failed loudly to say so.
+    """
+    assert readers.PREFERENCE[0] == "paddle-rec", "the plate-crop reader"
+    assert readers.SCENE_PREFERENCE[0] == "easyocr", "the find-it-yourself reader"
+    assert readers.PREFERENCE[0] not in readers.SCENE_PREFERENCE, (
+        "a recogniser with no detection stage must never be the scene reader"
+    )
+
+
+def test_the_scene_reader_falls_back_too(monkeypatch):
+    fallback = Loads()
+    monkeypatch.setitem(readers.BACKENDS, "easyocr", Fails)
+    monkeypatch.setitem(readers.BACKENDS, "paddle", lambda: fallback)
+
+    reader, problem = readers.build_scene()
+    assert reader is fallback and problem is None
+
+
+def test_with_no_scene_reader_the_reason_is_reported(monkeypatch):
+    for candidate in readers.SCENE_PREFERENCE:
+        monkeypatch.setitem(readers.BACKENDS, candidate, Fails)
+
+    reader, problem = readers.build_scene()
+    assert reader is None
+    for candidate in readers.SCENE_PREFERENCE:
+        assert candidate in problem
+
+
+def test_the_engine_asks_for_the_scene_reader_only_when_told_to(monkeypatch):
+    from app.anpr.engine import ANPREngine
+
+    plate_reader, scene_reader = Loads([("box", "PLATE", 0.9)]), Loads([("box", "SCENE", 0.9)])
+    monkeypatch.setattr(readers, "build", lambda name=None: (plate_reader, None))
+    monkeypatch.setattr(readers, "build_scene", lambda: (scene_reader, None))
+
+    engine = ANPREngine()
+    image = np.zeros((40, 140, 3), np.uint8)
+
+    assert engine._detect_text(image, localised=True)[0][1] == "PLATE"
+    assert engine._detect_text(image, localised=False)[0][1] == "SCENE"
+
+
+def test_a_missing_scene_reader_warns_once(monkeypatch):
+    """Otherwise every unlocated vehicle fails in silence."""
+    from app import ui
+    from app.anpr.engine import ANPREngine
+
+    said = []
+    monkeypatch.setattr(ui, "warn", said.append)
+    monkeypatch.setattr(readers, "build_scene", lambda: (None, "none installed"))
+
+    engine = ANPREngine()
+    image = np.zeros((40, 140, 3), np.uint8)
+    for _ in range(3):
+        assert engine._detect_text(image, localised=False) == []
+
+    assert len(said) == 1, f"warned {len(said)} times"
+    assert "none installed" in said[0]

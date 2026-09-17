@@ -1,4 +1,4 @@
-"""IBVAP command-line entrypoint.
+"""SENTINEL-X command-line entrypoint.
 
 Examples
 --------
@@ -21,11 +21,11 @@ from app.pipeline import run
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="ibvap",
-        description="IBVAP - Intelligent Border Video Analytics Platform (MVP)",
+        prog="sentinelx",
+        description="SENTINEL-X - Surveillance Engine for Networked Threat Intelligence, Notification and Evidence Logging (MVP)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--version", action="version", version=f"IBVAP {__version__}")
+    parser.add_argument("--version", action="version", version=f"SENTINEL-X {__version__}")
 
     src = parser.add_argument_group("input")
     src.add_argument(
@@ -189,7 +189,7 @@ def build_parser() -> argparse.ArgumentParser:
     out.add_argument(
         "--db",
         nargs="?",
-        const="data/ibvap.db",
+        const="data/sentinelx.db",
         default=None,
         metavar="PATH",
         help="also record alerts in a queryable SQLite store",

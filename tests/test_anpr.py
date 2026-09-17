@@ -177,7 +177,7 @@ def test_a_plate_crop_is_kept_even_when_ocr_reads_nothing(monkeypatch):
     engine = ANPREngine(attempt_interval=1)
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "XX9", 0.9)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "XX9", 0.9)],
     )
 
     frame, detection = vehicle_frame()
@@ -198,7 +198,7 @@ def test_reads_are_voted_on_across_frames(monkeypatch):
         ("MH12AB1234", 0.8), ("MH12AB1234", 0.9),
     ])
 
-    def one(self, image):
+    def one(self, image, localised=True):
         text, conf = next(sequence, ("", 0.0))
         return [([[0, 0], [90, 0], [90, 30], [0, 30]], text, conf)] if text else []
 
@@ -217,7 +217,7 @@ def test_reads_are_voted_on_across_frames(monkeypatch):
 def test_reading_stops_once_enough_reads_agree(monkeypatch):
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
     )
     engine = ANPREngine(attempt_interval=1, confident_reads=2, max_attempts=50,
                         min_sharpness=0)
@@ -232,7 +232,7 @@ def test_reading_stops_once_enough_reads_agree(monkeypatch):
 def test_a_low_confidence_read_is_ignored(monkeypatch):
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.01)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.01)],
     )
     engine = ANPREngine(attempt_interval=1, min_confidence=0.35, min_sharpness=0)
 
@@ -246,7 +246,7 @@ def test_each_vehicle_keeps_its_own_plate(monkeypatch):
     current = {"id": 1}
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [
+        lambda self, image, localised=True: [
             ([[0, 0], [90, 0], [90, 30], [0, 30]], plates[current["id"]], 0.9)
         ],
     )
@@ -268,7 +268,7 @@ def test_each_vehicle_keeps_its_own_plate(monkeypatch):
 def test_forgetting_a_track_clears_its_plate(monkeypatch):
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
     )
     engine = ANPREngine(attempt_interval=1, min_sharpness=0)
     frame, detection = vehicle_frame()
@@ -281,7 +281,7 @@ def test_forgetting_a_track_clears_its_plate(monkeypatch):
 
 
 def test_missing_ocr_degrades_instead_of_crashing(monkeypatch):
-    """Without a backend IBVAP still localises the plate and saves the crop."""
+    """Without a backend SENTINEL-X still localises the plate and saves the crop."""
     engine = ANPREngine(attempt_interval=1)
     monkeypatch.setattr(ANPREngine, "_ocr", lambda self: None)
 
@@ -346,7 +346,7 @@ def test_a_blurred_plate_is_skipped_rather_than_guessed_at(monkeypatch):
     """Motion blur makes OCR confidently wrong, not quietly absent."""
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
     )
 
     frame, detection = vehicle_frame()
@@ -366,7 +366,7 @@ def test_the_sharpest_crop_seen_is_kept_as_evidence(monkeypatch):
     # variance at all, so a rig that crops bodywork proves nothing.
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[70, 200], [220, 200], [220, 252], [70, 252]], "XX9", 0.9)],
+        lambda self, image, localised=True: [([[70, 200], [220, 200], [220, 252], [70, 252]], "XX9", 0.9)],
     )
 
     frame, detection = vehicle_frame()
@@ -394,7 +394,7 @@ def test_a_stationary_vehicle_is_still_read_repeatedly(monkeypatch):
     """A vehicle stopped at a checkpoint never grows; voting must still work."""
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
     )
     engine = ANPREngine(attempt_interval=1, confident_reads=3, min_sharpness=0)
     frame, detection = vehicle_frame()
@@ -410,7 +410,7 @@ def test_a_much_closer_view_earns_one_more_look(monkeypatch):
     """Approaching traffic gets a better angle; that is worth re-reading."""
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "MH12AB1234", 0.9)],
     )
     engine = ANPREngine(attempt_interval=1, confident_reads=2, min_sharpness=0)
     frame, detection = vehicle_frame()
@@ -536,7 +536,7 @@ def test_reads_of_different_lengths_are_not_merged():
 def test_the_engine_reports_only_a_real_consensus(monkeypatch):
     sequence = iter(["DL9CZ2581", "DL5CZ2581", "DL9CZ2581"])
 
-    def one(self, image):
+    def one(self, image, localised=True):
         text = next(sequence, "")
         return [([[0, 0], [90, 0], [90, 30], [0, 30]], text, 0.9)] if text else []
 
@@ -573,7 +573,7 @@ def test_no_crop_is_invented_when_the_plate_model_found_no_plate(monkeypatch):
     engine = ANPREngine(attempt_interval=1, plate_detector=FoundNothing())
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [300, 0], [300, 40], [0, 40]],
+        lambda self, image, localised=True: [([[0, 0], [300, 0], [300, 40], [0, 40]],
                               "wildfilmsindia.com", 0.99)],
     )
 
@@ -594,7 +594,7 @@ def test_the_fallback_still_runs_when_no_plate_model_is_installed(monkeypatch):
     assert engine.plate_detector is None
     monkeypatch.setattr(
         ANPREngine, "_detect_text",
-        lambda self, image: [([[0, 0], [90, 0], [90, 30], [0, 30]], "XX9", 0.9)],
+        lambda self, image, localised=True: [([[0, 0], [90, 0], [90, 30], [0, 30]], "XX9", 0.9)],
     )
 
     frame, detection = vehicle_frame()

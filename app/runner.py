@@ -30,7 +30,8 @@ from .alerts.events import IntrusionEvent
 from .anpr import PlateLedger
 from .tracking import PersonLedger
 from .config import SurveillanceConfig
-from .geo import CameraLocation, Geofence, InvalidLocation, SiteMap
+from .geo import (DEFAULT_BASEMAPS, Basemap, CameraLocation, Geofence,
+                  InvalidLocation, SiteMap)
 from .detection.base import Detection
 from .pipeline import QUIT_KEYS, WINDOW_PREFIX, SessionStats, SurveillancePipeline
 from .store import EventStore
@@ -104,7 +105,7 @@ def load_site_map(path: str | Path) -> SiteMap:
         if located is not None:
             # Half a wedge draws nothing, and saying nothing about it leaves
             # somebody who filled in a bearing wondering why the map is bare.
-            if (located.bearing is None) != (located.field_of_view is None):
+            if located.half_surveyed:
                 missing = "fov" if located.field_of_view is None else "bearing"
                 ui.warn(
                     f"{entry['camera_id']}: a coverage wedge needs both bearing "
@@ -119,7 +120,16 @@ def load_site_map(path: str | Path) -> SiteMap:
             fences.append(Geofence.from_dict(fence))
         except (InvalidLocation, TypeError, ValueError) as exc:
             raise ValueError(f"geofence {fence.get('name')!r}: {exc}") from exc
-    return SiteMap(cameras=cameras, geofences=tuple(fences))
+
+    # Map backgrounds. Absent means the public defaults; an empty list means a
+    # coordinate grid only, for a post that must fetch nothing from outside.
+    basemaps = DEFAULT_BASEMAPS
+    if raw.get("basemaps") is not None:
+        try:
+            basemaps = tuple(Basemap.from_dict(b) for b in raw["basemaps"])
+        except (InvalidLocation, TypeError, ValueError, AttributeError) as exc:
+            raise ValueError(f"basemaps: {exc}") from exc
+    return SiteMap(cameras=cameras, geofences=tuple(fences), basemaps=basemaps)
 
 
 def load_camera_specs(path: str | Path) -> list[CameraSpec]:
@@ -167,7 +177,7 @@ class CameraWorker:
 
     def start(self) -> None:
         self.thread = threading.Thread(
-            target=self._run, name=f"ibvap-{self.spec.camera_id}", daemon=True
+            target=self._run, name=f"sentinelx-{self.spec.camera_id}", daemon=True
         )
         self.thread.start()
 
@@ -194,8 +204,27 @@ class CameraWorker:
             "alerts": stats.alerts,
             "fps": round(stats.fps, 1),
             "link": health.to_dict() if health is not None else None,
-            "error": str(self.error) if self.error else None,
+            "error": self._explain(stats),
         }
+
+    def _explain(self, stats: SessionStats) -> str | None:
+        """Why this camera is not running, in words an operator can act on.
+
+        A camera that raises says so through the exception. A camera that opens
+        and then delivers nothing - the usual shape of "another program already
+        has this webcam" - used to end silently, leaving the dashboard showing
+        STOPPED with no reason beside a camera that *did* explain itself. Two
+        failures that look identical on screen and need completely different
+        fixes is the worst kind of gap.
+        """
+        if self.error is not None:
+            return str(self.error)
+        if self.alive or stats.frames:
+            return None
+        return (
+            f"opened but delivered no frames - another program may be using "
+            f"{self.spec.source}, or it has no video to give"
+        )
 
 
 class MultiCameraRunner:
@@ -207,6 +236,7 @@ class MultiCameraRunner:
         base_config: SurveillanceConfig,
         store: EventStore | None = None,
         event_hooks: Sequence[Callable[[IntrusionEvent], None]] = (),
+        capture_frames: bool = False,
     ) -> None:
         self.specs = list(specs)
         self.base_config = base_config
@@ -221,6 +251,10 @@ class MultiCameraRunner:
         self.detector: SharedDetector | None = None
         self.shared = False
         self.skipped: list[tuple[str, str]] = []
+        # Keep the newest annotated frame from each camera even when no window
+        # is open, so the dashboard can stream it. Only the newest is held -
+        # a viewer that falls behind should see live video, not a backlog.
+        self.capture_frames = capture_frames
         # OpenCV's GUI must be driven from one thread, so cameras post their
         # annotated frames here and the main loop draws them.
         self._frames: dict[str, Any] = {}
@@ -248,6 +282,11 @@ class MultiCameraRunner:
     def _post_frame(self, camera_id: str, frame) -> None:
         with self._frame_lock:
             self._frames[camera_id] = frame
+
+    def latest_frame(self, camera_id: str):
+        """The newest annotated frame from one camera, or None."""
+        with self._frame_lock:
+            return self._frames.get(camera_id)
 
     def _reachable(self, spec: CameraSpec) -> tuple[bool, str]:
         """Skip a camera that is not answering rather than stalling the fleet."""
@@ -296,7 +335,8 @@ class MultiCameraRunner:
                 event_hooks=self.event_hooks,
                 store=self.store,
                 detector=detector,
-                frame_sink=self._post_frame if config.view else None,
+                frame_sink=(self._post_frame
+                            if config.view or self.capture_frames else None),
                 plate_ledger=self.plate_ledger,
                 person_ledger=self.person_ledger,
             )

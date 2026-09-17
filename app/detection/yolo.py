@@ -1,6 +1,6 @@
 """YOLOv8 object detector (Ultralytics).
 
-Only the classes IBVAP is configured to watch are requested from the model:
+Only the classes SENTINEL-X is configured to watch are requested from the model:
 filtering at inference time is cheaper than discarding results afterwards, and
 it keeps unrelated COCO classes out of the tracker entirely.
 """

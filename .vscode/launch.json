@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "IBVAP: synthetic demo (no model needed)",
+      "name": "SENTINEL-X: synthetic demo (no model needed)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -17,7 +17,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: loitering escalation (2 alerts)",
+      "name": "SENTINEL-X: loitering escalation (2 alerts)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -35,7 +35,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: camera tampering",
+      "name": "SENTINEL-X: camera tampering",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -51,7 +51,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: demo video (real YOLO)",
+      "name": "SENTINEL-X: demo video (real YOLO)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -64,7 +64,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: vehicles + ANPR + registry",
+      "name": "SENTINEL-X: vehicles + ANPR + registry",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -82,7 +82,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: calibrated camera (metres)",
+      "name": "SENTINEL-X: calibrated camera (metres)",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -99,7 +99,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: webcam + live view",
+      "name": "SENTINEL-X: webcam + live view",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -113,7 +113,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: whole fleet",
+      "name": "SENTINEL-X: whole fleet",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
@@ -127,7 +127,7 @@
       "cwd": "${workspaceFolder}"
     },
     {
-      "name": "IBVAP: dashboard server",
+      "name": "SENTINEL-X: dashboard server",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/serve.py",

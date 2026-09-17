@@ -1,20 +1,34 @@
 {
   "camera_id": "CAM-01",
-  "_comment": "Laptop camera. It sits low and looks straight ahead, so the fence is the right-hand half of the frame, full height.",
+  "_comment": "Drawn in the SENTINEL-X dashboard.",
   "zones": [
     {
-      "name": "RESTRICTED",
-      "kind": "RESTRICTED",
-      "base_risk": 60,
-      "description": "No-entry area to the right of the desk",
-      "polygon": [[0.60, 0.00], [1.00, 0.00], [1.00, 1.00], [0.60, 1.00]]
-    },
-    {
-      "name": "WATCH",
+      "name": "GATE",
       "kind": "WATCH",
-      "base_risk": 30,
-      "description": "Approach corridor in front of the desk",
-      "polygon": [[0.35, 0.00], [0.60, 0.00], [0.60, 1.00], [0.35, 1.00]]
+      "base_risk": 60,
+      "description": "Drawn in the dashboard.",
+      "objects": [
+        "PERSON",
+        "VEHICLE"
+      ],
+      "polygon": [
+        [
+          0.6189,
+          0.2995
+        ],
+        [
+          0.9447,
+          0.301
+        ],
+        [
+          0.955,
+          0.9854
+        ],
+        [
+          0.6486,
+          0.9945
+        ]
+      ]
     }
   ]
 }

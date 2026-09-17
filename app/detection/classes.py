@@ -1,4 +1,4 @@
-"""What IBVAP is willing to detect, and how it groups it.
+"""What SENTINEL-X is willing to detect, and how it groups it.
 
 YOLO already recognises vehicles; the MVP simply threw them away. This registry
 is the mapping back: COCO class ids to the labels an operator reads, grouped

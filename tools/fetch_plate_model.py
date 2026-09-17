@@ -1,6 +1,6 @@
 """Fetch the number-plate detection model.
 
-IBVAP works without it — the ANPR stage falls back to handing whole vehicles to
+SENTINEL-X works without it — the ANPR stage falls back to handing whole vehicles to
 the text detector — but plate *localisation* is dramatically better with it. On
 the same Delhi traffic footage:
 
@@ -49,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
             dest.write_bytes(response.read())
     except (urllib.error.URLError, OSError) as exc:
         print(f"could not download the plate model: {exc}", file=sys.stderr)
-        print("IBVAP will still run; plate localisation falls back to the", file=sys.stderr)
+        print("SENTINEL-X will still run; plate localisation falls back to the", file=sys.stderr)
         print("text detector, which finds plates far less reliably.", file=sys.stderr)
         return 1
 

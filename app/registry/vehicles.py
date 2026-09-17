@@ -88,7 +88,7 @@ class RegistryBackend(Protocol):
     """Where registration data comes from.
 
     A real, authorised RTO/VAHAN client implements this and nothing else in
-    IBVAP has to change.
+    SENTINEL-X has to change.
     """
 
     def lookup(self, plate: str) -> VehicleRecord | None:

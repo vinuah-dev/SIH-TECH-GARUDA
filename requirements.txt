@@ -1,4 +1,4 @@
-# IBVAP runtime dependencies (Python 3.10+)
+# SENTINEL-X runtime dependencies (Python 3.10+)
 
 # --- core: detection, tracking, video -----------------------------------
 ultralytics>=8.3,<9          # YOLOv8 person and vehicle detection
@@ -15,7 +15,7 @@ uvicorn>=0.27                # ASGI server
 websockets>=12.0             # WebSocket transport
 
 # --- ANPR ----------------------------------------------------------------
-# Optional. Without either of these IBVAP still locates plates and saves the
+# Optional. Without either of these SENTINEL-X still locates plates and saves the
 # crop as evidence; it simply cannot read the number. First use downloads
 # model weights.
 #

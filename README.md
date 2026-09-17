@@ -1,4 +1,6 @@
-# SANTINEL-X — Intelligent Border Surveillance & Security System
+# SENTINEL-X — Intelligent Border Surveillance & Security System
+
+*Surveillance Engine for Networked Threat Intelligence, Notification and Evidence Logging*
 
 **SIH 2026 · Problem Statement 26187**
 Ministry of Home Affairs · Sashastra Seema Bal (SSB), Police II Division
@@ -10,7 +12,7 @@ so border posts get analytics without replacing cameras with expensive smart har
 VIDEO → DETECTION → TRACKING → ZONES → CONTEXT → BEHAVIOUR → RISK → ALERT → EVIDENCE
 ```
 
-**926 automated tests.** Every claim below is qualified by whether it has been run
+**1001 automated tests.** Every claim below is qualified by whether it has been run
 against real footage or only against a test rig — see
 [What is proven, and what is not](#what-is-proven-and-what-is-not).
 
@@ -45,58 +47,161 @@ against real footage or only against a test rig — see
 
 ---
 
-## Quick start
+## How to run
+
+Works on Windows, Linux and macOS. Commands are shown for Windows PowerShell; on Linux
+or macOS use `python3` where it says `python`.
+
+### 1. What you need
+
+* **Python 3.10 or newer** (built and tested on 3.11)
+* About **3 GB of disk** for the Python packages (PyTorch and PaddleOCR are the big ones)
+* **No GPU**, and **no camera** for the first runs. A webcam, a video file or an RTSP
+  camera only when you want real footage.
+* Internet **once**, for `pip install` and for the YOLO weights on the first real-camera
+  run. After that it runs fully offline.
+
+### 2. Get the code and install it
+
+```bash
+git clone https://github.com/vinuah-dev/SIH.git
+cd SIH
+```
+
+Create a virtual environment so the packages stay out of your system Python:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+On Linux or macOS: `source .venv/bin/activate`. If PowerShell refuses to run the
+activation script, run `Set-ExecutionPolicy -Scope Process Bypass` first.
+
+On a machine without an NVIDIA GPU, install the small CPU build of PyTorch **first** —
+otherwise pip downloads several gigabytes of CUDA libraries that will never be used:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+```
+
+Then everything else:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-The fastest way to see the whole pipeline — no model download, no camera, works offline:
+If `paddlepaddle` will not install on your platform, delete the two Paddle lines from
+`requirements.txt` and run it again. Plate reading falls back to EasyOCR on its own;
+nothing else is affected.
+
+### 3. First run — no camera, no model
 
 ```bash
 python main.py --source synthetic --detector sim --force-night
 ```
 
-A threat that escalates as it unfolds:
+A simulated person crosses a virtual fence at night. Look for the `SECURITY ALERT`
+block: the risk score, and every factor that produced it.
+
+### 4. The dashboard — still no camera
 
 ```bash
-python main.py --source synthetic --detector sim --synthetic-frames 360 --linger --force-night
+python serve.py --cameras config/cameras-demo.json --detector sim --synthetic-frames 100000
 ```
 
-The cloned-plate story — a bus wearing a motorcycle's plate, crossing a fence:
+Open **http://127.0.0.1:8000**. Three simulated cameras, live alerts, incidents, the map
+and the zone editor all work. Stop the server with `Ctrl + C`.
 
-```bash
-python tools/make_vehicle_demo.py
-```
-
-```bash
-python main.py --source data/samples/vehicle_demo.mp4 --detect all --registry config/vehicle-registry.json --force-night --db
-```
-
-The plate on that clip is drawn on, not photographed. It demonstrates the pipeline end
-to end; it does not demonstrate that OCR reads real plates — see
-[ANPR: an honest account](#anpr-an-honest-account).
-
-Live camera, with an annotated window:
+### 5. Real footage
 
 ```bash
 python main.py --source webcam:0 --view --force-night
+python main.py --source path\to\clip.mp4 --view --detect all
+python main.py --source rtsp://user:pass@192.168.1.10:554/stream1 --view
+python main.py --source http://192.168.1.5:8080/video --view
 ```
 
-With more than one camera, `--view` draws a **single window** holding the whole fleet —
-a 2x2 wall for four cameras, not four windows to find and keep on top. Tile order is
-fixed by camera id, so a camera that connects late takes its own place instead of
-reshuffling the others under the operator's eye.
+The first is the laptop camera (press `q` in the window to close it), then a video file,
+an IP camera or NVR over RTSP, and a phone running the *IP Webcam* app. Real detection
+uses YOLOv8, whose weights (about 6 MB) download automatically the first time.
 
-Every camera in the fleet, one process, plus the dashboard on http://127.0.0.1:8000:
+Two demos worth showing:
 
 ```bash
-python serve.py --view
+python main.py --source synthetic --detector sim --synthetic-frames 360 --linger --force-night
+python main.py --source data/samples/vehicle_demo.mp4 --detect all --registry config/vehicle-registry.json --force-night --db
 ```
 
-The API has **no authentication**. It binds to loopback by default for that reason;
-`--host 0.0.0.0` warns before exposing it. Put it behind a VPN or an authenticating
-reverse proxy before it leaves the machine.
+The first is a threat that escalates as it unfolds. The second is the cloned-plate
+story — a bus wearing a motorcycle's plate, crossing a fence. That plate is drawn on, not
+photographed: it demonstrates the pipeline end to end, not that OCR reads real plates —
+see [ANPR: an honest account](#anpr-an-honest-account).
+
+### 6. Your own cameras on the dashboard
+
+List them in `config/cameras.json`, one entry per camera:
+
+```json
+{
+  "cameras": [
+    { "camera_id": "CAM-01", "source": "webcam:0" },
+    { "camera_id": "GATE-2", "source": "rtsp://user:pass@192.168.1.10:554/stream1" }
+  ]
+}
+```
+
+```bash
+python serve.py
+```
+
+Then open **http://127.0.0.1:8000**. The file as shipped has a laptop webcam and a phone
+camera on a private address — point the second at your own camera or delete it. A camera
+that does not answer is skipped at startup, and its tile says why.
+
+From the dashboard itself:
+
+* **Put cameras on the map** — *Map & geofence* opens a satellite map of India. Pick a
+  camera, click where it stands or paste its coordinates (Google Maps: right-click the
+  spot, click the numbers), then set its coverage: *points one way* (shift-click the
+  direction it faces) or *360°* for a dome or full-pan PTZ camera. *Save position* writes
+  it into the same `config/cameras.json`. No restart.
+* **Draw fences** — *Zone settings*: pick a camera, click the corners of the area, name
+  it, save. It applies immediately.
+
+### 7. Optional extras
+
+| For | Run once |
+| --- | --- |
+| Better plate localisation (ANPR) | `python tools/fetch_plate_model.py` |
+| Recognising people who belong at a gate | `python tools/enrol_face.py --id SSB-114 --label "Name" photo1.jpg photo2.jpg` |
+
+The face models are already in `models/`. `tools/fetch_face_models.py` downloads them again
+if they go missing.
+
+### 8. Run the tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```
+
+1001 tests. None of them need a camera, a model or a network.
+
+### If something goes wrong
+
+| Problem | Do this |
+| --- | --- |
+| `python` is not recognised (Windows) | Use `py` instead of `python` |
+| Webcam is black or busy | Close Teams, Zoom, the Camera app — and any earlier SENTINEL-X run |
+| The `--view` window does not appear | It opened behind your editor: `Alt + Tab` |
+| Port 8000 is already in use | `python serve.py --port 8100` |
+| Map page says *read-only* | The server was started with `--source`; start it with `--cameras` to save positions |
+| A camera tile says it is not answering | Its address in `config/cameras.json` is wrong or unreachable |
+
+**Security.** The API has **no authentication**. It binds to 127.0.0.1 by default for that
+reason, and `--host 0.0.0.0` warns before exposing it. Put it behind a VPN or an
+authenticating reverse proxy before it leaves the machine.
 
 ---
 
@@ -177,7 +282,7 @@ is not sure of.
 ## Project structure
 
 ```
-ibvap/
+sentinelx/
 ├── app/
 │   ├── pipeline.py            # wires every stage together, owns the run loop
 │   ├── runner.py              # many cameras, one process, one shared model
@@ -214,11 +319,13 @@ ibvap/
 │   │
 │   ├── alerts/                # events, console rendering, JSONL log, clips
 │   ├── store/database.py      # queryable SQLite event store
+│   ├── store/integrity.py     # SHA-256 hash chain over the event log
+│   ├── geo/location.py        # camera positions, direction wedges, geofences
 │   └── server/                # FastAPI dashboard, REST and WebSocket
 │
-├── config/                    # zones, cameras, vehicle registry
+├── config/                    # cameras (cameras-demo.json needs no hardware), zones, registry
 ├── data/                      # samples, evidence, event logs
-├── tests/                     # 926 tests, no model or camera required
+├── tests/                     # 1001 tests, no model or camera required
 ├── main.py                    # CLI entrypoint
 └── serve.py                   # server entrypoint
 ```
@@ -266,6 +373,11 @@ than stalling the fleet.
 python main.py --cameras config/cameras.json --view --db
 ```
 
+With more than one camera, `--view` draws a **single window** holding the whole fleet —
+a 2x2 wall for four cameras, not four windows to find and keep on top. Tile order is
+fixed by camera id, so a camera that connects late takes its own place instead of
+reshuffling the others under the operator's eye.
+
 ### Server
 
 ```bash
@@ -283,7 +395,19 @@ python serve.py --host 0.0.0.0 --port 8080
 | `/api/events/{id}` | One event in full |
 | `/api/behaviours` | How often each behaviour has fired |
 | `/api/incidents` | Events grouped into incidents, not one row per alert |
+| `/api/map` | Every camera's position, direction wedge and surrounding areas |
+| `/api/map/cameras/{id}` | `GET` one camera and its nearest neighbours · `PUT` place or move it · `DELETE` take it off the map |
+| `/api/cameras/{id}/zones` | `GET` / `PUT` the fences drawn on one camera |
+| `/api/cameras/{id}/stream` | The annotated view, as MJPEG |
+| `/api/cameras/{id}/snapshot` | One annotated still |
+| `/api/integrity` | Whether the hash-chained event log is still intact |
 | `/ws` | Live alert push |
+
+The dashboard streams live video for **two tiles at a time** and refreshes the rest as
+stills every second, and it closes every stream while the camera wall is off screen. A
+browser allows only six connections to one server; one stream per camera would use them
+all up and leave the alerts, the map and the zone editor waiting forever, with no error to
+say why.
 
 ### Useful flags
 
@@ -813,12 +937,67 @@ now — it is simply listed as `unplaced` by the map API rather than dropped, so
 visible that it exists and has not been surveyed yet.
 
 ```
-GET /api/map                      every camera's position, wedge and areas
-GET /api/map/cameras/CAM-01       one camera, plus its nearest neighbours in metres
+GET    /api/map                   every camera's position, wedge and areas
+GET    /api/map/cameras/CAM-01    one camera, plus its nearest neighbours in metres
+PUT    /api/map/cameras/CAM-01    place or move it: {"lat", "lon", "bearing", "fov", "height_m", "site"}
+DELETE /api/map/cameras/CAM-01    take it off the map; it keeps running
 ```
 
 `nearest` answers the question a map actually gets asked during an incident: *somebody
 left CAM-02 heading east — which camera should be watched now?*
+
+### Placing cameras from the dashboard
+
+Nobody surveys a post by typing decimals into JSON, so the *Map & geofence* page does it:
+pick a camera, click where it stands or paste its coordinates, set its coverage, save.
+The position is written back into the fleet file and the map updates at once. Drag to
+pan, scroll to zoom, *All India* to step back out.
+
+Coverage is one of three things:
+
+| Coverage | Saved as | Drawn as |
+| --- | --- | --- |
+| Not surveyed | no `bearing`, no `fov` | a pin |
+| Points one way | `bearing` + `fov` | a wedge — shift-click the map to aim it |
+| 360° — a dome or full-pan PTZ | `"fov": 360`, no `bearing` | a full circle |
+
+#### The map underneath
+
+The page shows real imagery — **satellite** by default, or **streets** — and falls back
+to a plain metre grid when it cannot reach any. On a post network with no internet that
+is the normal case, and nothing else changes: clicking, pasting, saving and the
+coverage drawing all work on the grid. Tiles are fetched by the browser, never by the
+server, and there is no map library and no CDN script behind them.
+
+Where the tiles come from is set in the fleet file. Leave `basemaps` out for the public
+defaults; point it at a tile server inside the post's own network; or set it to `[]` to
+fetch nothing from anywhere:
+
+```json
+"basemaps": [
+  { "name": "Post tiles", "url": "http://10.0.0.5/tiles/{z}/{x}/{y}.png",
+    "attribution": "in-house", "max_zoom": 18 }
+]
+```
+
+**About India's borders.** The public defaults are Esri satellite imagery and
+OpenStreetMap. Neither is a Survey of India product, and OpenStreetMap draws international
+boundaries as they are mapped on the ground rather than as India officially depicts them.
+Satellite imagery draws no boundaries at all, which is why it is the default. A real
+deployment should point `basemaps` at an approved source.
+
+Three rules make an unauthenticated write endpoint safe enough to have:
+
+* **The file is fixed when the server starts**, by `--cameras`, and never named by a
+  request. A server started with a single `--source` has no fleet file, and the page says
+  it is read-only rather than pretending to save.
+* **Only `location` is written.** A request cannot add a camera, remove one, or change
+  a camera's `source` — which would let anybody who reaches the port point the server at
+  any URL or file they liked.
+* **Nothing lands that would not load.** The new file is written beside the old one,
+  loaded exactly as startup loads it, and only then swapped in.
+
+A new camera starts as *not surveyed*, and stays a pin until somebody says otherwise.
 
 ### Two distinctions that matter
 
@@ -832,17 +1011,19 @@ Both are useful; neither converts into the other for free.
 **A bearing wedge is aim, not coverage.** `bearing` plus `fov` draws a wedge showing
 which way a camera points. A ridge, a wall or a parked truck takes most of that away. The
 wedge is only drawn when both are actually surveyed — a wedge from a guessed bearing
-points confidently at the wrong hillside, which is worse than no wedge at all.
+points confidently at the wrong hillside, which is worse than no wedge at all. A 360°
+camera is the one exception: it has no direction to guess, so `"fov": 360` alone draws
+its circle.
 
 Nothing in the running pipeline tests detections against geofences yet, and the README
-will say so until it does. This is the backend a map view will sit on, built now so the
-data model does not have to be retrofitted later.
+will say so until it does. Geofences are still drawn in the fleet file by hand; only
+cameras are placed from the dashboard.
 
 ---
 
 ## Vehicle registry
 
-IBVAP checks a read plate against what is registered to it, and flags a mismatch — a
+SENTINEL-X checks a read plate against what is registered to it, and flags a mismatch — a
 plate registered to a motorcycle, bolted to a truck, is the signature of a cloned or
 transplanted plate.
 
@@ -918,7 +1099,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-926 tests, none of which need a model, a camera or a network. Highlights of what they
+1001 tests, none of which need a model, a camera or a network. Highlights of what they
 pin down rather than merely cover:
 
 * A person standing exactly on a fence line counts as inside it.
@@ -1097,7 +1278,11 @@ note below it, because the project has since travelled a long way past that brie
 * Cross-camera linking: vehicles by plate, people by appearance
 * Multi-camera fleet in one process, sharing one loaded model
 * Dashboard, REST API and live WebSocket alert feed
-* 926 automated tests, none needing a model, a camera or a network
+* Virtual fences drawn on a live frame from the dashboard, applied without a restart
+* Cameras placed on a satellite map of India from the dashboard — fixed direction or
+  360° — saved to the fleet file, with a grid fallback when there is no internet
+* SHA-256 hash-chained event log: editing or deleting a past event is detectable
+* 1001 automated tests, none needing a model, a camera or a network
 
 ### NEXT
 

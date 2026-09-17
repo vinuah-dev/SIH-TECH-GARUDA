@@ -1,0 +1,48 @@
+{
+  "_comment": "A fleet that needs no hardware. Every camera is the built-in synthetic scene, so the dashboard, the map and the zone editor can be tried on any machine without a webcam. Run it with the simulated detector:  python serve.py --cameras config/cameras-demo.json --detector sim --synthetic-frames 100000",
+  "cameras": [
+    {
+      "camera_id": "DEMO-GATE",
+      "source": "synthetic",
+      "location": {
+        "lat": 28.613939,
+        "lon": 77.209023,
+        "bearing": 90,
+        "fov": 60,
+        "height_m": 4,
+        "site": "Gate A"
+      }
+    },
+    {
+      "camera_id": "DEMO-FENCE",
+      "source": "synthetic",
+      "location": {
+        "lat": 28.614512,
+        "lon": 77.20987,
+        "bearing": 200,
+        "fov": 70,
+        "height_m": 6,
+        "site": "Fence line"
+      }
+    },
+    {
+      "camera_id": "DEMO-RIVER",
+      "source": "synthetic",
+      "_note": "left unplaced on purpose - put it on the map from the Map & geofence page"
+    }
+  ],
+  "_location_note": "Placeholder coordinates for a development machine, not a real post.",
+  "geofences": [
+    {
+      "name": "SECTOR-7",
+      "kind": "SECTOR",
+      "description": "Placeholder sector around the demo cameras",
+      "polygon": [
+        [28.6100, 77.2050],
+        [28.6180, 77.2050],
+        [28.6180, 77.2130],
+        [28.6100, 77.2130]
+      ]
+    }
+  ]
+}

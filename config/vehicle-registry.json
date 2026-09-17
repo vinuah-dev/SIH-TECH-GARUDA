@@ -1,5 +1,5 @@
 {
-  "_comment": "Local vehicle registration extract. IBVAP does NOT connect to VAHAN or any RTO system - this is the kind of periodic extract or watchlist a post would be issued. A real authorised API implements RegistryBackend and drops in here unchanged. SAMPLE DATA: these plates are invented for testing.",
+  "_comment": "Local vehicle registration extract. SENTINEL-X does NOT connect to VAHAN or any RTO system - this is the kind of periodic extract or watchlist a post would be issued. A real authorised API implements RegistryBackend and drops in here unchanged. SAMPLE DATA: these plates are invented for testing.",
   "vehicles": [
     {
       "plate": "MH12AB1234",

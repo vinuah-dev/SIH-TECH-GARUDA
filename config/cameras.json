@@ -18,13 +18,13 @@
     },
     {
       "camera_id": "CAM-PHONE",
-      "source": "http://172.16.148.165:8080/video",
+      "source": "http://100.66.98.0:8080/video",
       "zones": "config/zones-phone.json",
       "_note": "IP Webcam app on the phone - update the IP if it changes",
       "reconnect_attempts": 5,
       "location": {
         "lat": 28.614512,
-        "lon": 77.209870,
+        "lon": 77.20987,
         "site": "Checkpost 1",
         "_note": "no bearing surveyed yet, so the map draws a pin and no wedge"
       }
@@ -37,10 +37,22 @@
       "kind": "SECTOR",
       "description": "Placeholder sector covering both development cameras",
       "polygon": [
-        [28.6100, 77.2050],
-        [28.6180, 77.2050],
-        [28.6180, 77.2130],
-        [28.6100, 77.2130]
+        [
+          28.61,
+          77.205
+        ],
+        [
+          28.618,
+          77.205
+        ],
+        [
+          28.618,
+          77.213
+        ],
+        [
+          28.61,
+          77.213
+        ]
       ]
     }
   ]

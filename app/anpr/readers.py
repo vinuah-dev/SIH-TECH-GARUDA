@@ -175,3 +175,23 @@ def build(name: str | None = None) -> tuple[object | None, str | None]:
         except Exception as exc:
             problems.append(f"{candidate}: {exc}")
     return None, "; ".join(problems)
+
+
+# Recognisers that find text on their own, for reading a whole vehicle when the
+# plate model located nothing. The default reader deliberately has no detection
+# stage - excellent on a plate crop, useless on a picture of a bus - so this is
+# a separate preference list rather than the same one reordered.
+SCENE_PREFERENCE = ("easyocr", "paddle")
+
+
+def build_scene() -> tuple[object | None, str | None]:
+    """The best available recogniser that can locate text by itself."""
+    problems = []
+    for candidate in SCENE_PREFERENCE:
+        reader = BACKENDS[candidate]()
+        try:
+            reader.load()
+            return reader, None
+        except Exception as exc:
+            problems.append(f"{candidate}: {exc}")
+    return None, "; ".join(problems)

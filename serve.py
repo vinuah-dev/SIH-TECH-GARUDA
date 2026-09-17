@@ -1,4 +1,4 @@
-"""IBVAP server entrypoint.
+"""SENTINEL-X server entrypoint.
 
 Runs the camera fleet and serves the dashboard and API:
 
@@ -19,16 +19,16 @@ from app.runner import CameraSpec, load_camera_specs, load_site_map
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="ibvap-serve",
-        description="IBVAP - dashboard and API over the camera fleet",
+        prog="sentinelx-serve",
+        description="SENTINEL-X - dashboard and API over the camera fleet",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--version", action="version", version=f"IBVAP {__version__}")
+    parser.add_argument("--version", action="version", version=f"SENTINEL-X {__version__}")
 
     net = parser.add_argument_group("server")
     net.add_argument("--host", default="127.0.0.1", help="bind address (0.0.0.0 to expose)")
     net.add_argument("--port", type=int, default=8000)
-    net.add_argument("--db", default="data/ibvap.db", help="event store to read and write")
+    net.add_argument("--db", default="data/sentinelx.db", help="event store to read and write")
 
     src = parser.add_argument_group("cameras")
     src.add_argument("--cameras", default="config/cameras.json", help="fleet configuration")
@@ -106,13 +106,19 @@ def main(argv: list[str] | None = None) -> int:
     # draw without a second file to keep in step. A single --source run has no
     # fleet file and therefore no map, which is correct rather than an omission.
     fences = ()
+    basemaps = None                       # the public defaults, unless the file says
     if not args.source:
         try:
-            fences = load_site_map(args.cameras).geofences
+            site = load_site_map(args.cameras)
+            fences, basemaps = site.geofences, site.basemaps
         except (FileNotFoundError, ValueError) as exc:
             ui.warn(f"map areas not loaded: {exc}")
 
-    app = create_app(specs, config, db_path=args.db, geofences=fences)
+    # Cameras placed on the dashboard map are saved back into this same file.
+    # A --source run has none, and the map says so instead of pretending to save.
+    app = create_app(specs, config, db_path=args.db, geofences=fences,
+                     basemaps=basemaps,
+                     fleet_path=None if args.source else args.cameras)
 
     ui.banner()
     ui.info(f"Cameras: {', '.join(s.camera_id for s in specs)}")
@@ -147,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     # thread is left free to pump the camera windows.
     import threading
 
-    web = threading.Thread(target=server.run, daemon=True, name="ibvap-web")
+    web = threading.Thread(target=server.run, daemon=True, name="sentinelx-web")
     web.start()
     try:
         service = app.state.service

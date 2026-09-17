@@ -144,7 +144,7 @@ def test_alerts_reach_the_sqlite_store(tmp_path):
     """The --db path: pipeline -> EventStore, queryable afterwards."""
     from app.store import EventStore
 
-    db = tmp_path / "ibvap.db"
+    db = tmp_path / "sentinelx.db"
     config = make_config(tmp_path, db_path=db)
     stats = SurveillancePipeline(config, store=EventStore(db)).run()
 

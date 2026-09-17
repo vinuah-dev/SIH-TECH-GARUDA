@@ -69,7 +69,7 @@ def test_writing_the_same_id_twice_does_not_duplicate(store):
 
 
 def test_creates_its_parent_directory(tmp_path):
-    store = EventStore(tmp_path / "nested" / "deeper" / "ibvap.db")
+    store = EventStore(tmp_path / "nested" / "deeper" / "sentinelx.db")
     store.write(make_event())
     assert store.count() == 1
     store.close()

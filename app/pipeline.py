@@ -1,4 +1,4 @@
-"""The IBVAP surveillance pipeline.
+"""The SENTINEL-X surveillance pipeline.
 
     frame -> detection -> tracking -> zone check -> risk -> alert -> log
 
@@ -42,7 +42,7 @@ from .zones.manager import Zone, ZoneManager
 EVENT_TYPE = "VIRTUAL FENCE INTRUSION"
 TAMPER_EVENT_TYPE = "CAMERA TAMPERING"
 STATUS_INTERVAL = 2.0
-WINDOW_PREFIX = "IBVAP - Live Surveillance"
+WINDOW_PREFIX = "SENTINEL-X - Live Surveillance"
 QUIT_KEYS = (ord("q"), 27)
 
 
@@ -626,7 +626,10 @@ class SurveillancePipeline:
                     )
 
             annotated = None
-            if pending or self.config.view:
+            # Also drawn when something is watching through a sink - the
+            # dashboard streams this frame, and a viewer that only sees a
+            # picture when an alert fires is not a live view.
+            if pending or self.config.view or self.frame_sink is not None:
                 annotated = annotate(
                     frame.image,
                     list(self.zones),
@@ -643,10 +646,14 @@ class SurveillancePipeline:
                     track, assessment, behaviours, event_type,
                 )
 
-            if self.config.view and annotated is not None:
+            if annotated is not None:
+                # A sink means somebody else is drawing this - the fleet's own
+                # window, or the dashboard streaming it. Only a lone camera
+                # with a window of its own draws here, because OpenCV's GUI
+                # must be driven from one thread and this is not it.
                 if self.frame_sink is not None:
                     self.frame_sink(self.config.camera_id, annotated)
-                else:
+                elif self.config.view:
                     cv2.imshow(self._window, annotated)
                     if cv2.waitKey(1) & 0xFF in QUIT_KEYS:
                         ui.warn("Live view closed by operator.")
@@ -654,6 +661,23 @@ class SurveillancePipeline:
 
             self._check_confirmation_window()
             self._heartbeat(frame.index)
+
+    def reload_zones(self) -> int:
+        """Re-read the fence file while the camera keeps running.
+
+        Drawing a fence and then restarting the post to use it is the kind of
+        friction that means fences never get redrawn. The context engine holds
+        a reference to the manager, so it is rebuilt against the new zones
+        rather than left pointing at the old ones - which would leave the
+        approach and dwell tracking judging a fence that is no longer there.
+        """
+        self.zones = ZoneManager.from_file(self.config.zones_path)
+        self.context = ContextEngine(self.zones, armed_kinds=self.config.alert_kinds)
+        ui.info(
+            f"[{self.config.camera_id}] fences reloaded from "
+            f"{self.config.zones_path} ({len(self.zones)} zones)"
+        )
+        return len(self.zones)
 
     def _check_confirmation_window(self) -> None:
         """Warn when the frame rate makes the confirmation window dangerous.

@@ -125,6 +125,22 @@ class CameraLocation:
              + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2)
         return 2 * EARTH_RADIUS * math.asin(min(1.0, math.sqrt(a)))
 
+    @property
+    def all_round(self) -> bool:
+        """A 360-degree camera: it has a field of view but no one direction."""
+        return self.field_of_view is not None and self.field_of_view >= 360.0
+
+    @property
+    def half_surveyed(self) -> bool:
+        """A bearing without a field of view, or the other way round.
+
+        Draws a pin and no wedge. A 360-degree camera with no bearing is not
+        this - it needs none.
+        """
+        if self.all_round:
+            return False
+        return (self.bearing is None) != (self.field_of_view is None)
+
     def coverage_wedge(self, reach_m: float = 120.0, points: int = 12) -> list[list[float]]:
         """The area the camera *points at*, as a polygon for a map.
 
@@ -133,7 +149,13 @@ class CameraLocation:
         faces, and it is empty unless both bearing and field of view are known,
         because a wedge from a guessed bearing points confidently at the wrong
         hillside.
+
+        The exception is a 360-degree camera - a fisheye or a PTZ with full pan
+        - which has no single direction to get wrong. Its field of view alone
+        draws a full circle.
         """
+        if self.all_round:
+            return [list(self._offset(360.0 * i / 36, reach_m)) for i in range(37)]
         if self.bearing is None or self.field_of_view is None:
             return []
 
@@ -226,12 +248,89 @@ class Geofence:
         return inside
 
 
+@dataclass(frozen=True)
+class Basemap:
+    """A map background: web-map tiles in the usual {z}/{x}/{y} layout.
+
+    The dashboard's browser fetches these, never the server - the server only
+    says where they are. That is what lets a post with no internet swap the
+    public defaults for a tile server inside its own network, and it is why a
+    page that cannot reach any tiles falls back to a coordinate grid instead of
+    breaking: positions, wedges and saving all work without imagery.
+    """
+
+    name: str
+    url: str
+    attribution: str = ""
+    max_zoom: int = 19
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise InvalidLocation("a basemap needs a name")
+        # A path on this server, or http(s). Not "//host", which is a
+        # different host in disguise, and not "javascript:" or "data:".
+        local = self.url.startswith("/") and not self.url.startswith("//")
+        if not (local or self.url.startswith(("https://", "http://"))):
+            raise InvalidLocation(
+                f"basemap {self.name!r}: url must start with https://, http:// or /"
+            )
+        missing = [part for part in ("{z}", "{x}", "{y}") if part not in self.url]
+        if missing:
+            raise InvalidLocation(
+                f"basemap {self.name!r}: url is missing {', '.join(missing)}"
+            )
+        if not 1 <= self.max_zoom <= 22:
+            raise InvalidLocation(f"basemap {self.name!r}: max_zoom must be 1 to 22")
+
+    @classmethod
+    def from_dict(cls, raw: dict) -> "Basemap":
+        try:
+            max_zoom = int(raw.get("max_zoom", 19))
+        except (TypeError, ValueError) as exc:
+            raise InvalidLocation(f"basemap max_zoom is not a number: {raw!r}") from exc
+        return cls(
+            name=str(raw.get("name") or ""),
+            url=str(raw.get("url") or ""),
+            attribution=str(raw.get("attribution") or ""),
+            max_zoom=max_zoom,
+        )
+
+    def to_dict(self) -> dict:
+        return {"name": self.name, "url": self.url,
+                "attribution": self.attribution, "max_zoom": self.max_zoom}
+
+
+# Public tiles, for a machine with internet. Neither is a Survey of India
+# product, and OpenStreetMap draws international boundaries as they are mapped
+# on the ground rather than as India officially depicts them - satellite
+# imagery draws no boundaries at all, which is why it is the default. A post
+# should point "basemaps" in its fleet file at an approved, in-network source.
+DEFAULT_BASEMAPS: tuple[Basemap, ...] = (
+    Basemap(
+        name="Satellite",
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/"
+            "MapServer/tile/{z}/{y}/{x}",
+        attribution="Imagery: Esri, Maxar, Earthstar Geographics, GIS User Community",
+        max_zoom=19,
+    ),
+    Basemap(
+        name="Streets",
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+        attribution="© OpenStreetMap contributors",
+        max_zoom=19,
+    ),
+)
+
+
 @dataclass
 class SiteMap:
     """Everything the map knows: where the cameras are, and what areas exist."""
 
     cameras: dict[str, CameraLocation] = field(default_factory=dict)
     geofences: tuple[Geofence, ...] = ()
+    # What to draw underneath. An empty tuple is a deliberate choice - a
+    # coordinate grid and nothing fetched from anywhere.
+    basemaps: tuple[Basemap, ...] = DEFAULT_BASEMAPS
 
     @classmethod
     def from_file(cls, path: str | Path) -> "SiteMap":
@@ -247,9 +346,13 @@ class SiteMap:
             located = CameraLocation.from_dict(entry)
             if located is not None:
                 cameras[str(camera_id)] = located
+        basemaps = DEFAULT_BASEMAPS
+        if raw.get("basemaps") is not None:
+            basemaps = tuple(Basemap.from_dict(b) for b in raw["basemaps"])
         return cls(
             cameras=cameras,
             geofences=tuple(Geofence.from_dict(g) for g in (raw.get("geofences") or [])),
+            basemaps=basemaps,
         )
 
     def locate(self, camera_id: str) -> CameraLocation | None:
@@ -294,6 +397,7 @@ class SiteMap:
                 for camera_id, location in sorted(self.cameras.items())
             ],
             "geofences": [fence.to_dict() for fence in self.geofences],
+            "basemaps": [basemap.to_dict() for basemap in self.basemaps],
             "located": len(self.cameras),
         }
 

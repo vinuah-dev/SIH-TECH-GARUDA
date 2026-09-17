@@ -12,7 +12,7 @@ the one that appears most often is far more trustworthy than any single one.
 A plate read once at 60% confidence is a guess; the same string read four
 times is a number.
 
-The OCR backend is optional and lazily loaded. Without it, IBVAP still detects
+The OCR backend is optional and lazily loaded. Without it, SENTINEL-X still detects
 and localises plates and saves the crop as evidence - an operator can read it
 even when the machine cannot.
 """
@@ -221,6 +221,10 @@ class ANPREngine:
     _plates: dict[int, _TrackPlate] = field(default_factory=dict, init=False)
     _reader = None
     _reader_failed: bool = field(default=False, init=False)
+    # A second recogniser, one that can find text by itself, for the
+    # whole-vehicle reads the primary cannot do. Loaded only if reached.
+    _scene_reader: object | None = field(default=None, init=False, repr=False)
+    _scene_failed: bool = field(default=False, init=False)
     _frame: int = field(default=0, init=False)
     _clock: float = field(default=0.0, init=False)
     _ocr_failures: int = field(default=0, init=False)
@@ -243,7 +247,7 @@ class ANPREngine:
             return self._reader
         reader, problem = readers.build(self.ocr_backend)
         if reader is None:
-            # Reported once: without OCR, IBVAP still localises plates and
+            # Reported once: without OCR, SENTINEL-X still localises plates and
             # saves the crop, so this degrades the feature rather than the run.
             self._reader_failed = True
             self._reader = None
@@ -253,6 +257,26 @@ class ANPREngine:
         self._reader = reader
         self.reader_name = reader.name
         return self._reader
+
+    def _scene_ocr(self):
+        """A recogniser that can find text on its own, for whole-vehicle reads.
+
+        Only needed when the plate model found nothing and there is no plate
+        crop to hand over. Loaded lazily, because on footage where localisation
+        works it is never reached.
+        """
+        if self._scene_reader is not None or self._scene_failed:
+            return self._scene_reader
+        reader, problem = readers.build_scene()
+        if reader is None:
+            self._scene_failed = True
+            ui.warn(
+                f"no scene-text recogniser, so vehicles whose plate could not "
+                f"be located are not read at all: {problem}"
+            )
+            return None
+        self._scene_reader = reader
+        return self._scene_reader
 
     @property
     def ocr_failures(self) -> int:
@@ -453,13 +477,36 @@ class ANPREngine:
                     state.crop, state.best_sharpness = crop, focus
                     state.crop_from_model = True
 
-        region = self._region_for(frame, detection)
-        if region is None:
-            return
-        x1, y1, x2, y2 = region
+        # Read the plate itself when we have it, and the whole vehicle only
+        # when we do not.
+        #
+        # This split exists because the two cases need different recognisers.
+        # The default reader is PaddleOCR's *recogniser alone*, which has no
+        # text-detection stage: on a located plate crop it reads 73.2% exactly,
+        # and on a whole vehicle it has no way to find the plate among the
+        # bodywork and returns nothing. A scene-text recogniser is the reverse -
+        # it finds text anywhere but reads plates far worse.
+        #
+        # Feeding the whole vehicle to the recogniser regardless, which is what
+        # this did at first, silently broke reading on any footage where the
+        # plate model missed. The demo clip was one.
+        if located is not None:
+            height, width = frame.shape[:2]
+            pad = 4
+            x1, y1 = max(0, located[0] - pad), max(0, located[1] - pad)
+            x2, y2 = min(width, located[2] + pad), min(height, located[3] + pad)
+            if x2 - x1 < 8 or y2 - y1 < 4:
+                return
+            localised = True
+        else:
+            region = self._region_for(frame, detection)
+            if region is None:
+                return
+            x1, y1, x2, y2 = region
+            localised = False
 
         scaled, scale = plate_finder.upscale_for_text(frame[y1:y2, x1:x2])
-        results = self._detect_text(scaled)
+        results = self._detect_text(scaled, localised=localised)
         if not results:
             return
 
@@ -656,14 +703,19 @@ class ANPREngine:
             if state.votes and not state.best(self.min_agreeing_reads)
         }
 
-    def _detect_text(self, image: np.ndarray):
+    def _detect_text(self, image: np.ndarray, localised: bool = True):
         """The single seam through which all OCR happens.
 
         Returns the detector's own (box, text, confidence) triples, so plate
         selection can use *where* each string was found and not only what it
         said.
+
+        `localised` says whether the image is a plate or a whole vehicle. It
+        decides which recogniser is used, because they fail at opposite things:
+        the default reads a plate crop far better than any scene-text model and
+        cannot find a plate inside a picture of a bus at all.
         """
-        reader = self._ocr()
+        reader = self._ocr() if localised else self._scene_ocr()
         if reader is None:
             return []
         try:

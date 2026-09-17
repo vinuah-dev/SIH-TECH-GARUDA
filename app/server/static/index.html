@@ -1,339 +1,1870 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IBVAP — Command Dashboard</title>
+<title>SENTINEL-X — Command Center</title>
 <style>
-  :root {
-    --bg: #0e1116; --panel: #161b22; --line: #262d38; --text: #e6edf3;
-    --dim: #8b949e; --low: #3fb950; --medium: #d29922; --high: #f85149;
-    --critical: #db61ff; --accent: #58a6ff;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 14px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
-  }
-  header {
-    padding: 14px 20px; border-bottom: 1px solid var(--line);
-    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
-  }
-  h1 { font-size: 15px; margin: 0; letter-spacing: .06em; }
-  .sub { color: var(--dim); font-size: 12px; }
-  .live { margin-left: auto; font-size: 12px; }
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-         background: var(--high); margin-right: 6px; vertical-align: middle; }
-  .dot.on { background: var(--low); }
-  main { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 16px; }
-  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
-  h2 { font-size: 11px; letter-spacing: .12em; color: var(--dim);
-       margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); }
-  .body { padding: 12px 14px; }
-  .row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
-  .row .k { color: var(--dim); }
-  .cam { padding: 10px 0; border-bottom: 1px solid var(--line); }
-  .cam:last-child { border-bottom: 0; }
-  .cam .name { font-weight: 600; }
-  .pill { font-size: 11px; padding: 1px 7px; border-radius: 10px;
-          border: 1px solid var(--line); color: var(--dim); }
-  .pill.ok { color: var(--low); border-color: var(--low); }
-  .pill.bad { color: var(--high); border-color: var(--high); }
-  .alerts { max-height: 74vh; overflow-y: auto; }
-  .alert { padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  .alert:last-child { border-bottom: 0; }
-  .alert.new { animation: flash 1.4s ease-out; }
-  @keyframes flash { from { background: #1f2b3a; } to { background: transparent; } }
-  .alert .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .score { font-weight: 700; font-size: 16px; }
-  .LOW { color: var(--low); } .MEDIUM { color: var(--medium); }
-  .HIGH { color: var(--high); } .CRITICAL { color: var(--critical); }
-  .type { font-weight: 600; }
-  .when { color: var(--dim); font-size: 12px; margin-left: auto; }
-  .tags { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
-  .tag { font-size: 11px; padding: 1px 7px; border-radius: 3px;
-         background: #21262d; color: var(--accent); }
-  .plate { font-weight: 700; letter-spacing: .09em; padding: 1px 8px;
-           border-radius: 3px; background: #f2f2f2; color: #101010;
-           border: 1px solid #999; }
-  .reg { font-size: 12px; color: var(--dim); margin-top: 6px; }
-  .reg.bad { color: var(--high); font-weight: 600; }
-  .reg.flag { color: var(--critical); font-weight: 600; }
-  .files { margin-top: 6px; font-size: 11px; color: var(--dim); }
-  .files span { margin-right: 10px; }
-  .why { color: var(--dim); font-size: 12px; margin-top: 6px; }
-  .factors { margin-top: 6px; font-size: 12px; color: var(--dim); }
-  .factors span { margin-right: 12px; white-space: nowrap; }
-  .empty { color: var(--dim); padding: 24px 14px; text-align: center; }
-  .toggle { margin-left: auto; display: flex; gap: 4px; }
-  .toggle button {
-    font: inherit; font-size: 11px; letter-spacing: .08em; cursor: pointer;
-    background: transparent; color: var(--dim); border: 1px solid var(--line);
-    border-radius: 3px; padding: 2px 10px;
-  }
-  .toggle button.on { color: var(--text); border-color: var(--accent); }
-  .count { font-size: 11px; color: var(--dim); }
+/* No web fonts, no CDN and no script from anywhere else in this file. A demo
+   runs on whatever network the room has, and a dashboard that needs the
+   internet to work is a dashboard that breaks in front of the people judging
+   it. The one thing fetched from outside is map imagery, and the map works on
+   a plain coordinate grid without it. */
+:root{
+  --bg:#0a0f16; --panel:#111823; --panel-2:#0d141d; --line:#1e2836;
+  --ink:#e8eef5; --ink-2:#93a3b8; --ink-3:#5d6e85;
+  --accent:#22d3ee; --accent-dim:#0e7490;
+  --critical:#f43f5e; --high:#fb923c; --medium:#facc15; --low:#38bdf8;
+  --ok:#34d399;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:14px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  min-height:100vh;
+}
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+
+/* ---------------------------------------------------------------- sidebar */
+.side{background:var(--panel-2);border-right:1px solid var(--line);
+      display:flex;flex-direction:column}
+.brand{padding:18px 16px;border-bottom:1px solid var(--line)}
+.brand h1{font-size:17px;font-weight:600;letter-spacing:.06em;color:var(--ink)}
+.brand span{font-size:10px;letter-spacing:.12em;color:var(--ink-3);text-transform:uppercase}
+.nav{padding:12px 8px;flex:1}
+.nav a{display:block;padding:9px 12px;border-radius:6px;color:var(--ink-2);
+       text-decoration:none;font-size:13px;margin-bottom:2px;cursor:pointer}
+.nav a:hover{background:#16202c;color:var(--ink)}
+.nav a.on{background:#12303a;color:var(--accent)}
+.side-foot{padding:14px 16px;border-top:1px solid var(--line);
+           font-size:11px;color:var(--ink-3);line-height:1.6}
+
+/* ------------------------------------------------------------------- main */
+.main{display:flex;flex-direction:column;min-width:0}
+.top{display:flex;align-items:center;gap:18px;padding:14px 20px;
+     border-bottom:1px solid var(--line);background:var(--panel-2)}
+.top h2{font-size:17px;font-weight:600;color:var(--accent)}
+.top p{font-size:12px;color:var(--ink-3)}
+.top .spacer{flex:1}
+.pill{display:flex;align-items:center;gap:7px;background:var(--panel);
+      border:1px solid var(--line);border-radius:7px;padding:7px 12px;font-size:12px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
+.dot.live{background:var(--ok)}
+.dot.dead{background:var(--critical)}
+
+.body{padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px}
+
+/* ------------------------------------------------------------------ cards */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+      padding:13px 15px;border-left:3px solid var(--line)}
+.stat.c-crit{border-left-color:var(--critical)}
+.stat.c-all{border-left-color:var(--high)}
+.stat.c-cam{border-left-color:var(--accent)}
+.stat.c-fps{border-left-color:var(--ok)}
+.stat.c-inc{border-left-color:#a78bfa}
+.stat h3{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+         color:var(--ink-3);font-weight:600;margin-bottom:7px}
+.stat .n{font-size:27px;font-weight:600;line-height:1.1}
+.stat .s{font-size:11.5px;color:var(--ink-3);margin-top:3px}
+
+.grid{display:grid;grid-template-columns:1.55fr 1fr;gap:14px;align-items:start}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;align-items:start}
+@media(max-width:1150px){.grid,.grid-3{grid-template-columns:1fr}}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+       overflow:hidden;min-width:0}
+.panel > header{display:flex;align-items:center;gap:9px;padding:11px 14px;
+                border-bottom:1px solid var(--line)}
+.panel > header h3{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+                   font-weight:600;color:var(--ink-2)}
+.panel > header .spacer{flex:1}
+.panel > header .tag{font-size:11px;color:var(--ink-3)}
+.panel .pad{padding:13px 14px}
+.tab{background:none;border:1px solid var(--line);color:var(--ink-3);
+     border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;
+     font-family:inherit}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--accent);border-color:var(--accent-dim);background:#0d2630}
+.ev{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.ev a{font-size:11.5px;color:var(--accent);text-decoration:none;
+      border:1px solid var(--accent-dim);border-radius:5px;padding:3px 9px}
+.ev a:hover{background:#0d2630}
+.crop{max-width:100%;border:1px solid var(--line);border-radius:6px;margin-top:8px}
+
+/* Views. Panels are moved between the overview grid and their own page rather
+   than duplicated - a second copy would mean duplicate ids and, worse, a
+   second live <img> pulling a second video stream off the same camera. */
+.view{display:none;flex-direction:column;gap:14px}
+.view.on{display:flex}
+.solo{display:flex;flex-direction:column;gap:14px}
+.hint{font-size:12px;color:var(--ink-3);line-height:1.65}
+.hint b{color:var(--ink-2);font-weight:500}
+
+/* ------------------------------------------------------------ zone editor */
+.zed{display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start}
+@media(max-width:1000px){.zed{grid-template-columns:1fr}}
+.canvas{position:relative;border:1px solid var(--line);border-radius:8px;
+        overflow:hidden;background:#070b11;cursor:crosshair}
+.canvas img{display:block;width:100%}
+.canvas svg{position:absolute;inset:0;width:100%;height:100%}
+.canvas .waiting{padding:60px 20px;text-align:center;color:var(--ink-3);font-size:12.5px}
+.field{margin-bottom:11px}
+.field label{display:block;font-size:10.5px;letter-spacing:.09em;
+             text-transform:uppercase;color:var(--ink-3);font-weight:600;margin-bottom:5px}
+.field input,.field select{width:100%;background:var(--panel-2);color:var(--ink);
+  border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:12.5px;
+  font-family:inherit}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent-dim)}
+.btn{background:var(--accent-dim);color:#e8feff;border:none;border-radius:6px;
+     padding:8px 14px;font-size:12.5px;cursor:pointer;font-family:inherit;font-weight:500}
+.btn:hover{background:#0891a8}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--ink-2)}
+.btn.ghost:hover{background:#16202c;color:var(--ink)}
+.btn.danger{background:none;border:1px solid #4c1526;color:var(--critical)}
+.btn.danger:hover{background:#2a0d16}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:11px}
+.zlist{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.zrow{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:12.5px}
+.zrow .sw{width:10px;height:10px;border-radius:3px;flex:none}
+.zrow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zrow .k{font-size:10.5px;color:var(--ink-3)}
+.note{font-size:12px;padding:9px 11px;border-radius:6px;margin-top:11px;display:none}
+.note.on{display:block}
+.note.ok{background:#08251c;border:1px solid #14503c;color:var(--ok)}
+.note.bad{background:#2a0d16;border:1px solid #4c1526;color:var(--critical)}
+
+/* --------------------------------------------------------------- cameras */
+.cams{display:grid;grid-template-columns:repeat(3,1fr);
+      gap:10px;padding:13px 14px}
+@media(max-width:900px){.cams{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.cams{grid-template-columns:1fr}}
+.cam{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#070b11}
+.cam .bar{display:flex;align-items:center;gap:6px;padding:7px 9px;
+          background:var(--panel-2);font-size:11.5px}
+.cam .bar b{font-weight:500;color:var(--ink)}
+.cam .bar .site{color:var(--ink-3)}
+.cam .bar .spacer{flex:1}
+.cam .bar .st{font-size:10px;letter-spacing:.05em}
+.cam .shot{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#070b11}
+.cam .none{display:flex;align-items:center;justify-content:center;
+           aspect-ratio:16/10;color:var(--ink-3);font-size:11.5px;text-align:center;padding:10px}
+
+/* ---------------------------------------------------------------- alerts */
+.alerts{max-height:430px;overflow-y:auto}
+.alert{padding:10px 14px;border-bottom:1px solid var(--line);
+       border-left:3px solid var(--line);cursor:pointer}
+.alert:hover{background:#131c27}
+.alert.CRITICAL{border-left-color:var(--critical)}
+.alert.HIGH{border-left-color:var(--high)}
+.alert.MEDIUM{border-left-color:var(--medium)}
+.alert.LOW{border-left-color:var(--low)}
+.alert .r1{display:flex;align-items:baseline;gap:8px}
+.alert .ttl{font-size:13px;font-weight:500;flex:1;min-width:0;
+            overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.alert .t{font-size:11px;color:var(--ink-3);white-space:nowrap}
+.alert .r2{display:flex;align-items:center;gap:8px;margin-top:3px}
+.alert .meta{font-size:11.5px;color:var(--ink-3);flex:1;min-width:0;
+             overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge{font-size:9.5px;font-weight:600;letter-spacing:.07em;padding:2px 7px;
+       border-radius:4px;border:1px solid}
+.badge.CRITICAL{color:var(--critical);border-color:#4c1526;background:#2a0d16}
+.badge.HIGH{color:var(--high);border-color:#4a2a12;background:#2a1808}
+.badge.MEDIUM{color:var(--medium);border-color:#453a0f;background:#241f06}
+.badge.LOW{color:var(--low);border-color:#123449;background:#08202e}
+.empty{padding:26px 14px;text-align:center;color:var(--ink-3);font-size:12.5px}
+
+/* ------------------------------------------------------------ behaviours */
+.beh{display:flex;flex-direction:column;gap:8px;padding:13px 14px}
+.beh .row{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.beh .row .nm{flex:1;color:var(--ink-2);overflow:hidden;
+              text-overflow:ellipsis;white-space:nowrap}
+.beh .row .ct{color:var(--ink);font-variant-numeric:tabular-nums}
+.beh .track{height:5px;border-radius:3px;background:#16202c;overflow:hidden;
+            width:88px;flex:none}
+.beh .fill{height:100%;background:var(--accent)}
+
+/* ------------------------------------------------------------------- map */
+.mapwrap{padding:13px 14px}
+svg.map{width:100%;height:auto;display:block;background:#070d14;
+        border:1px solid var(--line);border-radius:7px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:11px;color:var(--ink-3)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;
+          margin-right:5px;vertical-align:middle}
+
+/* --------------------------------------------------------- camera placer */
+.mapcanvas{background:#070d14;user-select:none}
+.mapcanvas svg{position:static;display:block;width:100%;height:auto}
+.readout{margin-left:auto;align-self:center;font-size:11.5px;color:var(--ink-3);
+         font-variant-numeric:tabular-nums}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.plist{border:1px solid var(--line);border-radius:6px;max-height:196px;overflow:auto}
+.plist button{display:flex;width:100%;align-items:center;gap:8px;background:none;
+  border:none;border-bottom:1px solid var(--line);color:var(--ink-2);padding:7px 9px;
+  font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
+.plist button:last-child{border-bottom:none}
+.plist button:hover{background:#16202c;color:var(--ink)}
+.plist button.on{background:#0c2a33;color:var(--ink)}
+.plist .st{margin-left:auto;font-size:10.5px;color:var(--ink-3)}
+.plist .st.placed{color:var(--ok)}
+.check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);
+       margin:2px 0 11px;cursor:pointer}
+.field input[type=range]{padding:0;border:none;background:none;accent-color:var(--accent)}
+.field label span{color:var(--ink);text-transform:none;letter-spacing:0;font-weight:500}
+.aimrow.off{opacity:.38;pointer-events:none}
+.hint code{font-size:11.5px;color:var(--ink-2)}
+.mselect{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line);
+  border-radius:6px;padding:6px 9px;font-size:12.5px;font-family:inherit}
+.mapnote{position:absolute;left:10px;top:10px;right:10px;background:#0a0f16eb;
+  border:1px solid #5a4514;color:var(--medium);font-size:12px;line-height:1.5;
+  padding:8px 11px;border-radius:6px;pointer-events:none}
+
+/* ----------------------------------------------------------------- fleet */
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+   color:var(--ink-3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--line)}
+td{padding:9px 14px;border-bottom:1px solid var(--line);color:var(--ink-2)}
+tr:last-child td{border-bottom:none}
+td.num{font-variant-numeric:tabular-nums;color:var(--ink)}
+
+/* ------------------------------------------------------------------ feed */
+.feed{display:flex;align-items:center;gap:12px;padding:9px 20px;
+      border-top:1px solid var(--line);background:var(--panel-2);
+      font-size:11.5px;color:var(--ink-2);overflow:hidden}
+.feed .lbl{display:flex;align-items:center;gap:6px;color:var(--accent);
+           font-weight:600;letter-spacing:.06em;font-size:10.5px;flex:none}
+.feed .items{display:flex;gap:20px;overflow:hidden;white-space:nowrap}
+.feed .items span b{color:var(--ink);font-weight:500}
+
+/* ----------------------------------------------------------------- modal */
+.scrim{position:fixed;inset:0;background:#000a;display:none;
+       align-items:center;justify-content:center;padding:24px;z-index:50}
+.scrim.on{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:11px;
+       max-width:620px;width:100%;max-height:86vh;overflow-y:auto}
+.modal header{display:flex;align-items:center;gap:10px;padding:14px 17px;
+              border-bottom:1px solid var(--line)}
+.modal header h3{font-size:14px;font-weight:600;flex:1}
+.modal .x{background:none;border:none;color:var(--ink-3);font-size:19px;
+          cursor:pointer;line-height:1;padding:0 4px}
+.modal .x:hover{color:var(--ink)}
+.modal .pad{padding:15px 17px}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 12px;font-size:12.5px;
+    margin-bottom:14px}
+.kv dt{color:var(--ink-3)}
+.kv dd{color:var(--ink)}
+.factors{border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.factor{display:flex;gap:11px;padding:8px 12px;border-bottom:1px solid var(--line);
+        font-size:12.5px}
+.factor:last-child{border-bottom:none}
+.factor .p{font-variant-numeric:tabular-nums;font-weight:600;min-width:42px}
+.factor .p.up{color:var(--high)}
+.factor .p.down{color:var(--ok)}
+.factor .d{color:var(--ink-2);flex:1}
+.factor .d b{color:var(--ink);font-weight:500;display:block}
+.why{font-size:12.5px;color:var(--ink-2);line-height:1.65;margin-bottom:13px}
+h4.sec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+       color:var(--ink-3);font-weight:600;margin:0 0 8px}
 </style>
 </head>
 <body>
-<header>
-  <h1>IBVAP — INTELLIGENT BORDER VIDEO ANALYTICS</h1>
-  <span class="sub">Ministry of Home Affairs · Sashastra Seema Bal</span>
-  <span class="live"><span class="dot" id="dot"></span><span id="conn">connecting…</span></span>
-</header>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <h1>SENTINEL-X</h1>
+      <span>Intelligent Border Surveillance</span>
+    </div>
+    <nav class="nav">
+      <a class="on" data-view="dashboard">Dashboard</a>
+      <a data-view="surveillance">Live surveillance</a>
+      <a data-view="alertsPage">Alerts &amp; incidents</a>
+      <a data-view="behPage">Behaviour intelligence</a>
+      <a data-view="mapPage">Map &amp; geofence</a>
+      <a data-view="fleetPage">Camera fleet</a>
+      <a data-view="zonesPage">Zone settings</a>
+    </nav>
+    <div class="side-foot">
+      Ministry of Home Affairs<br>Sashastra Seema Bal
+    </div>
+  </aside>
 
-<main>
-  <div>
-    <section>
-      <h2>FLEET</h2>
-      <div class="body" id="fleet"><div class="empty">waiting…</div></div>
-    </section>
-    <section style="margin-top:16px">
-      <h2>TOTALS</h2>
-      <div class="body" id="totals"><div class="empty">waiting…</div></div>
-    </section>
-    <section style="margin-top:16px">
-      <h2>BEHAVIOURS SEEN</h2>
-      <div class="body" id="behaviours"><div class="empty">none yet</div></div>
-    </section>
+  <div class="main">
+    <div class="top">
+      <div>
+        <h2>Command center</h2>
+        <p>Real-time border monitoring and threat intelligence</p>
+      </div>
+      <div class="spacer"></div>
+      <div class="pill"><span class="dot" id="linkDot"></span><span id="linkText">connecting</span></div>
+      <div class="pill"><span id="clock">--:--:--</span></div>
+    </div>
+
+    <div class="body">
+      <!-- ------------------------------------------------------- dashboard -->
+      <div class="view on" id="view-dashboard">
+        <div class="stats">
+          <div class="stat c-crit"><h3>Critical alerts</h3><div class="n" id="sCrit">0</div><div class="s">highest severity</div></div>
+          <div class="stat c-all"><h3>Total alerts</h3><div class="n" id="sTotal">0</div><div class="s" id="sLatest">none yet</div></div>
+          <div class="stat c-cam"><h3>Cameras online</h3><div class="n" id="sCams">0 / 0</div><div class="s" id="sSkipped">&nbsp;</div></div>
+          <div class="stat c-fps"><h3>Throughput</h3><div class="n" id="sFps">0.0</div><div class="s">frames per second, fleet</div></div>
+          <div class="stat c-inc"><h3>Incidents</h3><div class="n" id="sInc">0</div><div class="s">grouped, not per alert</div></div>
+        </div>
+
+        <div class="grid">
+          <div id="slot-cams"></div>
+          <div id="slot-alerts"></div>
+        </div>
+
+        <div class="grid-3">
+          <div id="slot-beh"></div>
+          <div id="slot-map"></div>
+          <div id="slot-fleet"></div>
+        </div>
+      </div>
+
+      <!-- ---------------------------------------------------- single pages -->
+      <div class="view" id="view-surveillance"><div class="solo" id="page-cams"></div></div>
+      <div class="view" id="view-alertsPage"><div class="solo" id="page-alerts"></div></div>
+      <div class="view" id="view-behPage"><div class="solo" id="page-beh"></div></div>
+      <!-- --------------------------------------------------- camera placer -->
+      <div class="view" id="view-mapPage">
+        <section class="panel">
+          <header><h3>Camera positions</h3><div class="spacer"></div>
+            <span class="tag" id="mTag">&nbsp;</span></header>
+          <div class="pad">
+            <p class="hint">Pick a camera, then <b>click the map</b> to put it there — or
+              paste its coordinates (in Google Maps, right-click the spot and click the
+              numbers to copy them). <b>Shift-click</b> to point it. Drag to move around,
+              scroll to zoom. Saved into the fleet file (<code>config/cameras.json</code>)
+              and shown at once — <b>no restart.</b></p>
+
+            <div class="zed" style="margin-top:13px">
+              <div>
+                <div class="canvas mapcanvas" id="mCanvas">
+                  <svg id="mSvg" viewBox="0 0 900 560" role="img">
+                    <title>Camera positions: click to place, shift-click to aim</title>
+                    <rect width="900" height="560" fill="#070d14"/>
+                    <g id="mTiles"></g>
+                    <g id="mOver"></g>
+                  </svg>
+                  <div class="mapnote" id="mOffline" hidden>Map imagery could not load —
+                    probably no internet on this network. Everything still works on the
+                    grid, and positions still save.</div>
+                </div>
+                <div class="btnrow">
+                  <button class="btn ghost" id="mZoomIn">Zoom in</button>
+                  <button class="btn ghost" id="mZoomOut">Zoom out</button>
+                  <button class="btn ghost" id="mFit">Fit all cameras</button>
+                  <button class="btn ghost" id="mIndia">All India</button>
+                  <select class="mselect" id="mBase" title="Map background"></select>
+                  <span class="readout" id="mCursor"></span>
+                </div>
+              </div>
+
+              <div>
+                <div class="field">
+                  <label>Camera</label>
+                  <div class="plist" id="mList"></div>
+                </div>
+                <div class="field">
+                  <label for="mPaste">Paste coordinates</label>
+                  <input id="mPaste" placeholder="28.613939, 77.209023" autocomplete="off">
+                </div>
+                <div class="pair">
+                  <div class="field">
+                    <label for="mLat">Latitude</label>
+                    <input id="mLat" type="number" step="0.000001" min="-90" max="90">
+                  </div>
+                  <div class="field">
+                    <label for="mLon">Longitude</label>
+                    <input id="mLon" type="number" step="0.000001" min="-180" max="180">
+                  </div>
+                </div>
+                <div class="field">
+                  <label for="mSite">Site name</label>
+                  <input id="mSite" maxlength="60" placeholder="e.g. Gate A, River Bank">
+                </div>
+                <div class="field">
+                  <label for="mMode">Coverage</label>
+                  <select id="mMode">
+                    <option value="none">Not surveyed — pin only</option>
+                    <option value="fixed">Points one way</option>
+                    <option value="360">360° — sees all round</option>
+                  </select>
+                </div>
+                <div class="field aimrow off">
+                  <label for="mBearing">Faces <span id="mBearingOut"></span></label>
+                  <input id="mBearing" type="range" min="0" max="359" value="0">
+                </div>
+                <div class="field aimrow off">
+                  <label for="mFov">Field of view <span id="mFovOut"></span></label>
+                  <input id="mFov" type="range" min="10" max="355" value="70">
+                </div>
+                <div class="field">
+                  <label for="mHeight">Mounted height (m)</label>
+                  <input id="mHeight" type="number" min="0" max="500" step="0.1"
+                         placeholder="optional">
+                </div>
+                <div class="btnrow">
+                  <button class="btn" id="mSave" disabled>Save position</button>
+                  <button class="btn ghost" id="mRevert" disabled>Discard</button>
+                  <button class="btn danger" id="mRemove" disabled>Remove from map</button>
+                </div>
+                <div class="note" id="mNote"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="view" id="view-fleetPage"><div class="solo" id="page-fleet"></div></div>
+
+      <!-- ----------------------------------------------------- zone editor -->
+      <div class="view" id="view-zonesPage">
+        <section class="panel">
+          <header><h3>Virtual fences</h3><div class="spacer"></div>
+            <select id="zCamera" style="background:var(--panel-2);color:var(--ink);
+              border:1px solid var(--line);border-radius:6px;padding:5px 9px;
+              font-size:12px;font-family:inherit"></select></header>
+          <div class="pad">
+            <p class="hint">Click on the picture to drop the corners of a fence, then
+              name it and save. Coordinates are stored as fractions of the frame, so a
+              fence keeps working if the camera resolution changes.
+              <b>A saved fence applies immediately — no restart.</b></p>
+
+            <div class="zed" style="margin-top:13px">
+              <div>
+                <div class="canvas" id="zCanvas">
+                  <div class="waiting" id="zWaiting">select a camera…</div>
+                </div>
+                <div class="btnrow">
+                  <button class="btn ghost" id="zUndo">Undo point</button>
+                  <button class="btn ghost" id="zClear">Clear</button>
+                  <button class="btn ghost" id="zRefresh">Refresh picture</button>
+                </div>
+              </div>
+
+              <div>
+                <div class="field">
+                  <label for="zName">Fence name</label>
+                  <input id="zName" placeholder="RESTRICTED" maxlength="40">
+                </div>
+                <div class="field">
+                  <label for="zKind">Kind</label>
+                  <select id="zKind">
+                    <option value="RESTRICTED">RESTRICTED — raises alerts</option>
+                    <option value="WATCH">WATCH — observed only</option>
+                    <option value="PATROL">PATROL — observed only</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="zRisk">Base risk (0–100)</label>
+                  <input id="zRisk" type="number" min="0" max="100" value="60">
+                </div>
+                <div class="field">
+                  <label for="zObjects">Applies to</label>
+                  <select id="zObjects">
+                    <option value="PERSON,VEHICLE">People and vehicles</option>
+                    <option value="PERSON">People only</option>
+                    <option value="VEHICLE">Vehicles only</option>
+                  </select>
+                </div>
+                <button class="btn" id="zAdd" disabled>Add fence</button>
+
+                <div class="zlist" id="zList"></div>
+                <div class="btnrow">
+                  <button class="btn" id="zSave" disabled>Save to camera</button>
+                  <button class="btn ghost" id="zReload">Discard changes</button>
+                </div>
+                <div class="note" id="zNote"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ---- panels live here and are moved into whichever view shows them -->
+      <div id="panelHome" style="display:none">
+        <section class="panel" id="cams">
+          <header><h3>Live surveillance</h3><div class="spacer"></div>
+            <span class="tag" id="camTag">&nbsp;</span></header>
+          <div class="cams" id="camGrid"><div class="empty">waiting for the fleet…</div></div>
+        </section>
+
+        <section class="panel" id="alerts">
+          <header><h3 id="listTitle">Recent alerts</h3><div class="spacer"></div>
+            <button class="tab on" id="tabAlerts">Alerts</button>
+            <button class="tab" id="tabIncidents">Incidents</button></header>
+          <div class="alerts" id="alertList"><div class="empty">no alerts yet</div></div>
+        </section>
+
+        <section class="panel" id="beh">
+          <header><h3>Behaviour intelligence</h3></header>
+          <div class="beh" id="behList"><div class="empty">nothing observed yet</div></div>
+        </section>
+
+        <section class="panel" id="map">
+          <header><h3>Map &amp; geofence</h3><div class="spacer"></div>
+            <span class="tag" id="mapTag">&nbsp;</span></header>
+          <div class="mapwrap" id="mapWrap"><div class="empty">no camera locations surveyed</div></div>
+        </section>
+
+        <section class="panel" id="fleet">
+          <header><h3>Camera fleet</h3></header>
+          <div id="fleetWrap"><div class="empty">waiting…</div></div>
+        </section>
+      </div>
+    </div>
+
+    <div class="feed">
+      <span class="lbl"><span class="dot live"></span>LIVE FEED</span>
+      <div class="items" id="feedItems"><span>waiting for events…</span></div>
+    </div>
   </div>
+</div>
 
-  <section>
-    <h2 style="display:flex;align-items:center">
-      <span id="listTitle">ALERTS — NEWEST FIRST</span>
-      <span class="toggle">
-        <button id="tabAlerts" class="on">ALERTS</button>
-        <button id="tabIncidents">INCIDENTS</button>
-      </span>
-    </h2>
-    <div class="alerts" id="alerts"><div class="empty">no alerts yet</div></div>
-  </section>
-</main>
+<div class="scrim" id="scrim">
+  <div class="modal">
+    <header>
+      <h3 id="mTitle">Alert</h3>
+      <button class="x" id="mClose" aria-label="Close">&times;</button>
+    </header>
+    <div class="pad" id="mBody"></div>
+  </div>
+</div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const MAX_ALERTS = 200;
-let seen = new Set();
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const clock = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d) ? String(iso).slice(11, 19) : d.toLocaleTimeString();
+};
+// The event store keeps every run, so the newest event on screen may be from
+// this morning. On a wall display that reads as "happening now", which is the
+// one thing a security dashboard must never get wrong.
+const ago = (iso) => {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const secs = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (secs < 45) return "just now";
+  if (secs < 3600) return Math.round(secs / 60) + "m ago";
+  if (secs < 86400) return Math.round(secs / 3600) + "h ago";
+  return Math.round(secs / 86400) + "d ago";
+};
 
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"']/g, c => (
-    {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]
-  ));
+let events = [];
+let byId = {};
+
+async function get(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(path + " -> " + r.status);
+  return r.json();
 }
 
-function timeOf(iso) {
-  return esc(String(iso).replace("T", " ").slice(0, 19));
+/* ------------------------------------------------------------------ cards */
+function paintStats(status, summary, incidents) {
+  const sev = (summary && summary.by_severity) || {};
+  $("sCrit").textContent = sev.CRITICAL || 0;
+  $("sTotal").textContent = (summary && summary.total) || 0;
+  $("sLatest").textContent = summary && summary.latest
+    ? "latest " + clock(summary.latest) : "none yet";
+
+  const cams = (status && status.cameras) || [];
+  const live = cams.filter(c => c.running).length;
+  const skipped = (status && status.skipped) || [];
+  $("sCams").textContent = live + " / " + (cams.length + skipped.length);
+  $("sSkipped").textContent = skipped.length
+    ? skipped.length + " not answering" : "all reachable";
+
+  const fps = cams.reduce((a, c) => a + (c.fps || 0), 0);
+  $("sFps").textContent = fps.toFixed(1);
+  $("sInc").textContent = (incidents && incidents.count) || 0;
 }
 
-function alertNode(ev, isNew) {
-  const sev = esc(ev.risk.severity);
-  const el = document.createElement("div");
-  el.className = "alert" + (isNew ? " new" : "");
-  const behaviours = (ev.behaviours || [])
-    .map(b => `<span class="tag">${esc(b.name)}</span>`).join("");
+/* ---------------------------------------------------------------- cameras */
+let camsBuilt = "";
+function paintCameras(status, siteMap) {
+  const cams = (status && status.cameras) || [];
+  const skipped = (status && status.skipped) || [];
+  const sites = {};
+  ((siteMap && siteMap.cameras) || []).forEach(c => { sites[c.camera_id] = c.site; });
 
-  // A plate is the single most actionable thing on a vehicle alert, and a
-  // plate that does not match its vehicle is the reason to stop it.
-  const plate = ev.plate
-    ? `<span class="plate">${esc(ev.plate.display || ev.plate.text)}</span>`
-    : "";
+  const key = cams.map(c => c.camera_id + ":" + c.running + ":" + (c.error || "")).join("|")
+            + "#" + skipped.map(s => s.camera_id).join("|");
+  $("camTag").textContent = cams.length
+    ? cams.length + (cams.length === 1 ? " camera" : " cameras") : "";
+  if (key === camsBuilt) return;      // never rebuild a live <img>: it restarts the stream
+  camsBuilt = key;
 
-  let registry = "";
-  if (ev.registry) {
-    const rec = ev.registry.record || {};
-    const described = [rec.colour, rec.make, rec.model].filter(Boolean).join(" ");
-    if (!ev.registry.known) {
-      registry = `<div class="reg">not in registry extract</div>`;
-    } else if (ev.registry.flagged) {
-      registry = `<div class="reg flag">${esc(rec.status)} — ${esc(ev.registry.detail)}</div>`;
-    } else if (ev.registry.mismatch) {
-      registry = `<div class="reg bad">PLATE MISMATCH — ${esc(ev.registry.detail)}</div>`;
-    } else {
-      registry = `<div class="reg">registered: ${esc(rec.vehicle_class || "?")}` +
-                 `${described ? " — " + esc(described) : ""}</div>`;
-    }
-  }
+  const cells = cams.map(c => `
+    <div class="cam">
+      <div class="bar"><b>${esc(c.camera_id)}</b>
+        <span class="site">${esc(sites[c.camera_id] || "")}</span>
+        <span class="spacer"></span>
+        <span class="dot ${c.running ? "live" : "dead"}"></span>
+        <span class="st" style="color:${c.running ? "var(--ok)" : "var(--ink-3)"}">
+          ${c.running ? "LIVE" : "STOPPED"}</span>
+      </div>
+      ${c.running
+        ? `<img class="shot" alt="${esc(c.camera_id)} annotated view"
+               data-live="${esc(c.camera_id)}">`
+        : `<div class="none">${esc(c.error || "stopped")}</div>`}
+    </div>`);
 
-  const files = [
-    ev.evidence_path ? "<span>still</span>" : "",
-    ev.clip_path ? "<span>clip</span>" : "",
-    ev.plate_path ? "<span>plate image</span>" : "",
-  ].join("");
-  const factors = (ev.risk.factors || [])
-    .map(f => `<span>${f.points >= 0 ? "+" : ""}${f.points} ${esc(f.label)}</span>`).join("");
-  el.innerHTML =
-    `<div class="top">
-       <span class="score ${sev}">${ev.risk.score}</span>
-       <span class="${sev}">${sev}</span>
-       <span class="type">${esc(ev.event_type)}</span>
-       <span class="pill">${esc(ev.camera_id)}</span>
-       ${ev.zone ? `<span class="pill">${esc(ev.zone.name)}</span>` : ""}
-       ${plate}
-       <span class="when">${timeOf(ev.timestamp)}</span>
-     </div>
-     ${registry}
-     ${behaviours ? `<div class="tags">${behaviours}</div>` : ""}
-     <div class="why">${esc(ev.risk.reason)}</div>
-     <div class="factors">${factors}</div>
-     ${files ? `<div class="files">${files}</div>` : ""}`;
-  return el;
+  const dead = skipped.map(s => `
+    <div class="cam">
+      <div class="bar"><b>${esc(s.camera_id)}</b><span class="spacer"></span>
+        <span class="dot dead"></span><span class="st" style="color:var(--critical)">OFFLINE</span>
+      </div>
+      <div class="none">${esc(s.reason || "not answering")}</div>
+    </div>`);
+
+  const html = cells.concat(dead).join("");
+  $("camGrid").innerHTML = html || '<div class="empty">no cameras configured</div>';
+  syncStreams();
 }
 
-function addAlert(ev, isNew) {
-  if (seen.has(ev.event_id)) return;
-  seen.add(ev.event_id);
-  const box = $("alerts");
-  const empty = box.querySelector(".empty");
-  if (empty) empty.remove();
-  box.prepend(alertNode(ev, isNew));
-  while (box.children.length > MAX_ALERTS) box.lastChild.remove();
+/* ---------------------------------------------------------- stream budget */
+// An open MJPEG stream holds one browser connection for as long as it runs,
+// and a browser allows only six to one server. Streaming every camera would
+// leave nothing for the alert polling, the map or the zone editor: they would
+// wait forever, with no error anywhere to say why. So only LIVE_STREAMS tiles
+// stream; the rest show the same annotated frame as a still refreshed every
+// second; and nothing streams while the wall is off screen or the tab hidden.
+const LIVE_STREAMS = 2;
+
+function wallOnScreen() {
+  const wall = $("cams");
+  return !document.hidden && !!wall && wall.offsetParent !== null;
 }
 
-function incidentNode(inc) {
-  const sev = esc(inc.peak_severity);
-  const el = document.createElement("div");
-  el.className = "alert";
-  const behaviours = (inc.behaviours || [])
-    .map(b => `<span class="tag">${esc(b)}</span>`).join("");
-  const plate = inc.plate
-    ? `<span class="plate">${esc(inc.plate)}</span>` : "";
-  const span = inc.started === inc.ended
-    ? timeOf(inc.ended)
-    : `${timeOf(inc.started).slice(11)} – ${timeOf(inc.ended)}`;
-  el.innerHTML =
-    `<div class="top">
-       <span class="score ${sev}">${inc.peak_score}</span>
-       <span class="${sev}">${sev}</span>
-       <span class="type">${esc(inc.object || "EVENT")}</span>
-       ${(inc.cameras || []).map(c => `<span class="pill">${esc(c)}</span>`).join("")}
-       ${plate}
-       <span class="when">${span}</span>
-     </div>
-     <div class="why">${inc.events} event${inc.events === 1 ? "" : "s"}` +
-       `${inc.zones && inc.zones.length ? " · " + inc.zones.map(esc).join(", ") : ""}</div>
-     ${behaviours ? `<div class="tags">${behaviours}</div>` : ""}`;
-  return el;
+function tileMode(img, mode) {
+  clearTimeout(img._still);
+  img.dataset.mode = mode;
 }
 
-let view = "alerts";
+function refreshStill(img) {
+  if (img.dataset.mode !== "still" || !img.isConnected) return;
+  img.onload = img.onerror = () => {
+    img._still = setTimeout(() => refreshStill(img), 1000);
+  };
+  img.src = "/api/cameras/" + encodeURIComponent(img.dataset.live) + "/snapshot?t=" + Date.now();
+}
 
-async function renderIncidents() {
-  const box = $("alerts");
-  try {
-    const data = await fetch("/api/incidents").then(r => r.json());
-    box.innerHTML = "";
-    if (!data.count) {
-      box.innerHTML = '<div class="empty">no incidents yet</div>';
+function syncStreams() {
+  const show = wallOnScreen();
+  document.querySelectorAll("img[data-live]").forEach((img, i) => {
+    if (!show) {
+      if (img.dataset.mode) {
+        tileMode(img, "");
+        img.onload = img.onerror = null;
+        img.src = "";                     // this is what actually closes the stream
+      }
       return;
     }
-    data.incidents.forEach(inc => box.appendChild(incidentNode(inc)));
-  } catch (e) {
-    box.innerHTML = '<div class="empty">could not load incidents</div>';
-  }
+    if (i < LIVE_STREAMS) {
+      if (img.dataset.mode !== "stream") {
+        tileMode(img, "stream");
+        img.onload = img.onerror = null;
+        img.src = "/api/cameras/" + encodeURIComponent(img.dataset.live) + "/stream";
+      }
+    } else if (img.dataset.mode !== "still") {
+      tileMode(img, "still");
+      refreshStill(img);
+    }
+  });
 }
 
-function setView(next) {
-  view = next;
-  $("tabAlerts").classList.toggle("on", next === "alerts");
-  $("tabIncidents").classList.toggle("on", next === "incidents");
-  $("listTitle").textContent =
-    next === "alerts" ? "ALERTS — NEWEST FIRST" : "INCIDENTS — GROUPED";
-  if (next === "incidents") {
-    renderIncidents();
-  } else {
-    // Rebuild the alert list from the store rather than keeping two in sync.
-    const box = $("alerts");
-    box.innerHTML = '<div class="empty">no alerts yet</div>';
-    seen = new Set();
-    fetch("/api/events?limit=50").then(r => r.json())
-      .then(d => d.events.slice().reverse().forEach(ev => addAlert(ev, false)))
-      .catch(() => {});
-  }
+document.addEventListener("visibilitychange", syncStreams);
+
+/* ----------------------------------------------------------------- alerts */
+function alertRow(e) {
+  const sev = (e.risk && e.risk.severity) || "LOW";
+  const label = (e.object && e.object.label) || "OBJECT";
+  const zone = e.zone ? e.zone.name : "open ground";
+  const beh = (e.behaviours || []).map(b => b.name).join(", ");
+  return `
+    <div class="alert ${sev}" data-id="${esc(e.event_id)}">
+      <div class="r1">
+        <span class="ttl">${esc(label)} in ${esc(zone)}</span>
+        <span class="t">${clock(e.timestamp)} · ${ago(e.timestamp)}</span>
+      </div>
+      <div class="r2">
+        <span class="meta">${esc(e.camera_id)}${beh ? " · " + esc(beh) : ""}</span>
+        <span class="badge ${sev}">${esc(sev)} ${e.risk ? e.risk.score : ""}</span>
+      </div>
+    </div>`;
 }
 
-$("tabAlerts").onclick = () => setView("alerts");
-$("tabIncidents").onclick = () => setView("incidents");
-
-function renderStatus(s) {
-  const fleet = $("fleet");
-  const cams = s.cameras || [];
-  if (!cams.length && !(s.skipped || []).length) {
-    fleet.innerHTML = '<div class="empty">no cameras</div>';
-  } else {
-    fleet.innerHTML =
-      cams.map(c => {
-        const link = c.link ? c.link.state : (c.running ? "RUNNING" : "STOPPED");
-        const ok = c.running && link !== "OFFLINE";
-        return `<div class="cam">
-          <div class="row">
-            <span class="name">${esc(c.camera_id)}</span>
-            <span class="pill ${ok ? "ok" : "bad"}">${esc(link)}</span>
-          </div>
-          <div class="row"><span class="k">frames</span><span>${c.frames}</span></div>
-          <div class="row"><span class="k">alerts</span><span>${c.alerts}</span></div>
-          <div class="row"><span class="k">fps</span><span>${c.fps}</span></div>
-        </div>`;
-      }).join("") +
-      (s.skipped || []).map(k => `<div class="cam">
-          <div class="row">
-            <span class="name">${esc(k.camera_id)}</span>
-            <span class="pill bad">SKIPPED</span>
-          </div>
-          <div class="row"><span class="k">${esc(k.reason)}</span><span></span></div>
-        </div>`).join("");
-  }
-  $("totals").innerHTML =
-    `<div class="row"><span class="k">cameras</span><span>${cams.length}</span></div>
-     <div class="row"><span class="k">alerts</span><span>${s.total_alerts ?? 0}</span></div>
-     <div class="row"><span class="k">model</span><span>${esc(s.model_sharing)}</span></div>
-     <div class="row"><span class="k">dashboards</span><span>${s.dashboards_connected ?? 1}</span></div>`;
+function paintAlerts() {
+  $("alertList").innerHTML = events.length
+    ? events.slice(0, 40).map(alertRow).join("")
+    : '<div class="empty">no alerts yet</div>';
 }
 
-async function refreshSide() {
+function paintFeed() {
+  $("feedItems").innerHTML = events.length
+    ? events.slice(0, 6).map(e => {
+        const label = (e.object && e.object.label) || "object";
+        const zone = e.zone ? e.zone.name : "open ground";
+        return `<span>${clock(e.timestamp)} &nbsp;<b>${esc(label)}</b> in
+                ${esc(zone)} at ${esc(e.camera_id)}</span>`;
+      }).join("")
+    : "<span>waiting for events…</span>";
+}
+
+/* ------------------------------------------------------------- behaviours */
+function paintBehaviours(counts) {
+  const rows = Object.entries(counts || {}).sort((a, b) => b[1] - a[1]);
+  if (!rows.length) {
+    $("behList").innerHTML = '<div class="empty">nothing observed yet</div>';
+    return;
+  }
+  const top = rows[0][1] || 1;
+  $("behList").innerHTML = rows.slice(0, 9).map(([name, n]) => `
+    <div class="row">
+      <span class="nm">${esc(name)}</span>
+      <span class="track"><span class="fill" style="width:${Math.round(100 * n / top)}%"></span></span>
+      <span class="ct">${n}</span>
+    </div>`).join("");
+}
+
+/* -------------------------------------------------------------------- map */
+// Web Mercator - the projection every web map uses - so imagery tiles and the
+// cameras drawn on top of them line up at every zoom, from all of India down
+// to a single gate. Tiles are plain <image> elements: no map library, nothing
+// to load from a CDN.
+const TILE = 256;
+const MAX_LAT = 85.0511;
+const INDIA = [[6.5, 68.1], [37.1, 97.4]];
+const rad = (d) => d * Math.PI / 180;
+const deg = (r) => r * 180 / Math.PI;
+
+function worldPx(lat, lon, zoom) {
+  const size = TILE * Math.pow(2, zoom);
+  const s = Math.sin(rad(Math.max(-MAX_LAT, Math.min(MAX_LAT, lat))));
+  return [(lon + 180) / 360 * size, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * size];
+}
+
+function worldLatLon(x, y, zoom) {
+  const size = TILE * Math.pow(2, zoom);
+  return [deg(Math.atan(Math.sinh(Math.PI * (1 - 2 * y / size)))), x / size * 360 - 180];
+}
+
+function metresPerPx(lat, zoom) {
+  return 156543.03392 * Math.cos(rad(lat)) / Math.pow(2, zoom);
+}
+
+function toScreen(view, lat, lon) {
+  const [cx, cy] = worldPx(view.lat, view.lon, view.zoom);
+  const [x, y] = worldPx(lat, lon, view.zoom);
+  return [view.w / 2 + x - cx, view.h / 2 + y - cy];
+}
+
+function fromScreen(view, px, py) {
+  const [cx, cy] = worldPx(view.lat, view.lon, view.zoom);
+  return worldLatLon(cx + px - view.w / 2, cy + py - view.h / 2, view.zoom);
+}
+
+// Frame a set of points; with none, frame India.
+function fitView(points, w, h, maxZoom) {
+  const pts = points.length ? points : INDIA;
+  const lats = pts.map(p => p[0]), lons = pts.map(p => p[1]);
+  const [x0, y1] = worldPx(Math.min(...lats), Math.min(...lons), 0);
+  const [x1, y0] = worldPx(Math.max(...lats), Math.max(...lons), 0);
+  const fit = Math.log2(Math.min(w * 0.72 / Math.max(x1 - x0, 1e-9),
+                                 h * 0.72 / Math.max(y1 - y0, 1e-9)));
+  const [lat, lon] = worldLatLon((x0 + x1) / 2, (y0 + y1) / 2, 0);
+  return {lat, lon, w, h, zoom: Math.max(3, Math.min(maxZoom || 18, 17, fit))};
+}
+
+// The tiles covering a view, taken from the nearest whole zoom and scaled.
+function tilesFor(view, basemap) {
+  if (!basemap) return [];
+  const tz = Math.max(0, Math.min(basemap.max_zoom || 19, Math.round(view.zoom)));
+  const scale = Math.pow(2, view.zoom - tz), n = Math.pow(2, tz);
+  const [cx, cy] = worldPx(view.lat, view.lon, tz);
+  const left = cx - view.w / 2 / scale, top = cy - view.h / 2 / scale;
+  const out = [];
+  for (let ty = Math.floor(top / TILE); ty * TILE < top + view.h / scale; ty++) {
+    if (ty < 0 || ty >= n) continue;
+    for (let tx = Math.floor(left / TILE); tx * TILE < left + view.w / scale; tx++) {
+      const wrapped = ((tx % n) + n) % n;
+      out.push({
+        key: tz + "/" + tx + "/" + ty,
+        url: basemap.url.replace("{z}", tz).replace("{x}", wrapped).replace("{y}", ty),
+        x: (tx * TILE - left) * scale, y: (ty * TILE - top) * scale, size: TILE * scale,
+      });
+    }
+  }
+  return out;
+}
+
+function chosenBasemap(m) {
+  const maps = (m && m.basemaps) || [];
+  let name = null;
+  try { name = localStorage.getItem("sentinelx.basemap"); } catch (err) { /* private window */ }
+  if (name === "grid") return null;
+  return maps.find(b => b.name === name) || maps[0] || null;
+}
+
+// One bad tile is a hole in coverage. Several, and not one good, is a network
+// with no internet - fall back to the grid and say so, rather than show a map
+// full of broken squares.
+let tilesOk = 0, tilesBad = 0;
+function tileLoaded() { tilesOk++; }
+function tileFailed() {
+  tilesBad++;
+  if (tilesOk || tilesBad < 4 || window.__tilesOffline) return;
+  window.__tilesOffline = true;
+  const note = $("mOffline");
+  if (note) note.hidden = false;
+  if (mMap && mView) paintPlacer();
+  if (window.__siteMap) paintMap(window.__siteMap);
+}
+
+const HALO = 'paint-order="stroke" stroke="#05080c" stroke-width="3" stroke-linejoin="round"';
+
+function paintMap(m) {
+  const cams = (m && m.cameras) || [];
+  const fences = (m && m.geofences) || [];
+  $("mapTag").textContent = (m && m.unplaced && m.unplaced.length)
+    ? m.unplaced.length + " not placed" : "";
+
+  const W = 420, H = 260;
+  const pts = [];
+  cams.forEach(c => pts.push([c.lat, c.lon]));
+  fences.forEach(f => (f.polygon || []).forEach(p => pts.push(p)));
+  const base = window.__tilesOffline ? null : chosenBasemap(m);
+  const view = fitView(pts, W, H, base ? base.max_zoom : 18);
+  const at = (p) => toScreen(view, p[0], p[1]).map(v => v.toFixed(1)).join(",");
+
+  let svg = `<svg class="map" viewBox="0 0 ${W} ${H}" role="img">
+    <title>Camera positions and geofenced sectors</title>
+    <rect width="${W}" height="${H}" fill="#070d14"/>`;
+  tilesFor(view, base).forEach(tile => {
+    const size = (tile.size + 0.6).toFixed(1);
+    svg += `<image href="${esc(tile.url)}" x="${tile.x.toFixed(1)}" y="${tile.y.toFixed(1)}"
+             width="${size}" height="${size}" preserveAspectRatio="none"
+             onload="tileLoaded()" onerror="tileFailed()"/>`;
+  });
+
+  fences.forEach(f => {
+    svg += `<polygon points="${(f.polygon || []).map(at).join(" ")}" fill="#f43f5e1f"
+             stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+    const p0 = (f.polygon || [])[0];
+    if (p0) {
+      const [x, y] = toScreen(view, p0[0], p0[1]);
+      svg += `<text x="${(x + 6).toFixed(1)}" y="${(y + 14).toFixed(1)}" fill="#fda4af"
+               font-size="9" letter-spacing="0.08em" ${HALO}>${esc(f.name)}</text>`;
+    }
+  });
+
+  cams.forEach(c => {
+    if ((c.coverage || []).length)
+      svg += `<polygon points="${c.coverage.map(at).join(" ")}" fill="#22d3ee33"
+               stroke="#22d3ee" stroke-width="1"/>`;
+  });
+
+  cams.forEach(c => {
+    const [x, y] = toScreen(view, c.lat, c.lon);
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="#22d3ee"
+             stroke="#05080c" stroke-width="1.5"/>
+            <text x="${x.toFixed(1)}" y="${(y - 10).toFixed(1)}" fill="#e8eef5" font-size="9"
+             text-anchor="middle" ${HALO}>${esc(c.site || c.camera_id)}</text>`;
+  });
+
+  if (!cams.length)
+    svg += `<text x="${W / 2}" y="${H - 22}" fill="#e8eef5" font-size="11" text-anchor="middle"
+             ${HALO}>no cameras placed yet — place them on the Map &amp; geofence page</text>`;
+  if (base && base.attribution)
+    svg += `<text x="${W - 4}" y="${H - 5}" fill="#cbd5e1" font-size="7" text-anchor="end"
+             ${HALO}>${esc(base.attribution)}</text>`;
+
+  svg += "</svg>";
+  $("mapWrap").innerHTML = svg + `
+    <div class="legend">
+      <span><i style="background:#22d3ee"></i>camera</span>
+      <span><i style="background:#22d3ee55"></i>where it points</span>
+      <span><i style="background:#f43f5e"></i>geofenced sector</span>
+    </div>`;
+}
+
+/* ------------------------------------------------------------------ fleet */
+function paintFleet(status) {
+  const cams = (status && status.cameras) || [];
+  const skipped = (status && status.skipped) || [];
+  if (!cams.length && !skipped.length) {
+    $("fleetWrap").innerHTML = '<div class="empty">no cameras</div>';
+    return;
+  }
+  const rows = cams.map(c => c.running || !c.error ? `
+    <tr><td>${esc(c.camera_id)}</td>
+      <td class="num">${(c.fps || 0).toFixed(1)}</td>
+      <td class="num">${c.frames || 0}</td>
+      <td class="num">${c.alerts || 0}</td></tr>` : `
+    <tr><td>${esc(c.camera_id)}</td>
+      <td colspan="3" style="color:var(--critical)">${esc(c.error)}</td></tr>`)
+    .concat(skipped.map(s => `
+    <tr><td>${esc(s.camera_id)}</td>
+      <td colspan="3" style="color:var(--critical)">${esc(s.reason || "offline")}</td></tr>`));
+  $("fleetWrap").innerHTML =
+    `<table><thead><tr><th>Camera</th><th>FPS</th><th>Frames</th><th>Alerts</th></tr></thead>
+     <tbody>${rows.join("")}</tbody></table>`;
+}
+
+/* ------------------------------------------------------------------ modal */
+function showEvent(id) {
+  const e = byId[id];
+  if (!e) return;
+  const risk = e.risk || {};
+  const factors = (risk.factors || []).map(f => `
+    <div class="factor">
+      <span class="p ${f.points < 0 ? "down" : "up"}">${f.points > 0 ? "+" : ""}${f.points}</span>
+      <span class="d"><b>${esc(f.label)}</b>${esc(f.detail || "")}</span>
+    </div>`).join("");
+
+  $("mTitle").textContent = ((e.object && e.object.label) || "Object") + " · " +
+    (risk.severity || "") + " " + (risk.score != null ? risk.score + "/100" : "");
+
+  const beh = (e.behaviours || []).map(b => b.name).join(", ") || "—";
+  $("mBody").innerHTML = `
+    <dl class="kv">
+      <dt>Camera</dt><dd>${esc(e.camera_id)}</dd>
+      <dt>Time</dt><dd>${esc(String(e.timestamp || "").replace("T", " "))}</dd>
+      <dt>Zone</dt><dd>${esc(e.zone ? e.zone.name + " (" + e.zone.kind + ")" : "open ground")}</dd>
+      <dt>Track</dt><dd>${esc((e.object && e.object.track_label) || "—")}</dd>
+      <dt>Confidence</dt><dd>${e.object ? Math.round(e.object.confidence * 100) + "%" : "—"}</dd>
+      <dt>Behaviours</dt><dd>${esc(beh)}</dd>
+      ${e.plate ? `<dt>Plate</dt><dd>${esc(e.plate.display || e.plate.text)}</dd>` : ""}
+      ${e.registry ? `<dt>Registered</dt><dd>${esc(e.registry.detail || "")}</dd>` : ""}
+      <dt>Event ID</dt><dd>${esc(e.event_id)}</dd>
+    </dl>
+    ${risk.reason ? `<p class="why">${esc(risk.reason)}</p>` : ""}
+    ${evidenceLinks(e)}
+    <h4 class="sec">Contributing factors</h4>
+    <div class="factors">${factors || '<div class="factor"><span class="d">none recorded</span></div>'}</div>`;
+  $("scrim").classList.add("on");
+}
+
+function fileName(path) {
+  return path ? String(path).split(/[\/]/).pop() : "";
+}
+
+// Evidence is what turns an alert into something anybody can check afterwards.
+// The paths the event carries are filesystem paths on the box running this, so
+// they are served by name through /api/evidence rather than linked directly.
+function evidenceLinks(e) {
+  const items = [
+    ["Snapshot", e.evidence_path],
+    ["Clip", e.clip_path],
+    ["Plate crop", e.plate_path],
+  ].filter(([, path]) => path);
+  if (!items.length) return "";
+
+  const links = items.map(([label, path]) =>
+    `<a href="/api/evidence/${encodeURIComponent(fileName(path))}"
+        target="_blank" rel="noopener">${esc(label)}</a>`).join("");
+  const crop = e.plate_path
+    ? `<img class="crop" alt="plate crop"
+           src="/api/evidence/${encodeURIComponent(fileName(e.plate_path))}">`
+    : "";
+  return `<h4 class="sec">Evidence</h4><div class="ev">${links}</div>${crop}`;
+}
+
+/* -------------------------------------------------------------- incidents */
+let mode = "alerts";
+
+function incidentRow(inc) {
+  const sev = inc.peak_severity || "LOW";
+  const cams = (inc.cameras || []).join(", ");
+  const beh = (inc.behaviours || []).join(", ");
+  const zones = (inc.zones || []).filter(Boolean).join(", ");
+  const span = inc.started === inc.ended ? clock(inc.started)
+             : clock(inc.started) + " – " + clock(inc.ended);
+  return `
+    <div class="alert ${sev}" data-peak="${esc(inc.peak_event_id || "")}">
+      <div class="r1">
+        <span class="ttl">${esc(inc.object || "OBJECT")}${
+          inc.plate ? " · " + esc(inc.plate) : ""}${
+          zones ? " in " + esc(zones) : ""}</span>
+        <span class="t">${span}</span>
+      </div>
+      <div class="r2">
+        <span class="meta">${esc(cams)} · ${inc.events}
+          ${inc.events === 1 ? "alert" : "alerts"}${beh ? " · " + esc(beh) : ""}</span>
+        <span class="badge ${sev}">${esc(sev)} ${inc.peak_score != null ? inc.peak_score : ""}</span>
+      </div>
+    </div>`;
+}
+
+async function paintIncidents() {
   try {
-    const [status, behaviours] = await Promise.all([
-      fetch("/api/status").then(r => r.json()),
-      fetch("/api/behaviours").then(r => r.json()),
+    const data = await get("/api/incidents");
+    const rows = data.incidents || [];
+    $("alertList").innerHTML = rows.length
+      ? rows.map(incidentRow).join("")
+      : '<div class="empty">no incidents yet</div>';
+  } catch (err) {
+    $("alertList").innerHTML = '<div class="empty">could not load incidents</div>';
+  }
+}
+
+function setMode(next) {
+  mode = next;
+  $("tabAlerts").classList.toggle("on", mode === "alerts");
+  $("tabIncidents").classList.toggle("on", mode === "incidents");
+  $("listTitle").textContent = mode === "alerts" ? "Recent alerts" : "Incidents";
+  if (mode === "alerts") paintAlerts(); else paintIncidents();
+}
+
+/* ------------------------------------------------------------------- wire */
+$("tabAlerts").addEventListener("click", () => setMode("alerts"));
+$("tabIncidents").addEventListener("click", () => setMode("incidents"));
+
+$("alertList").addEventListener("click", async (ev) => {
+  const row = ev.target.closest(".alert");
+  if (!row) return;
+  if (row.dataset.id) return showEvent(row.dataset.id);
+  // An incident row opens its peak event - the worst moment is the one worth
+  // reading, and it may not be in the list already loaded.
+  const peak = row.dataset.peak;
+  if (!peak) return;
+  if (!byId[peak]) {
+    try { byId[peak] = await get("/api/events/" + encodeURIComponent(peak)); }
+    catch (err) { return; }
+  }
+  showEvent(peak);
+});
+$("mClose").addEventListener("click", () => $("scrim").classList.remove("on"));
+$("scrim").addEventListener("click", (ev) => {
+  if (ev.target === $("scrim")) $("scrim").classList.remove("on");
+});
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") $("scrim").classList.remove("on");
+});
+/* ------------------------------------------------------------------ views */
+// Which panel each page shows, and where it sits on the overview. The panel
+// node itself is moved rather than copied: a duplicate would mean duplicate
+// ids and a second <img> pulling a second video stream off one camera.
+const PAGES = {
+  dashboard:    null,
+  surveillance: {panel: "cams",   page: "page-cams",   home: "slot-cams"},
+  alertsPage:   {panel: "alerts", page: "page-alerts", home: "slot-alerts"},
+  behPage:      {panel: "beh",    page: "page-beh",    home: "slot-beh"},
+  // The map page is the camera placer, which draws its own map; the overview
+  // map stays on the dashboard, so it has a home but no page to move to.
+  mapPage:      {panel: "map",    page: null,          home: "slot-map"},
+  fleetPage:    {panel: "fleet",  page: "page-fleet",  home: "slot-fleet"},
+  zonesPage:    null,
+};
+
+const TITLES = {
+  dashboard:    ["Command center", "Real-time border monitoring and threat intelligence"],
+  surveillance: ["Live surveillance", "Every camera, annotated as the system sees it"],
+  alertsPage:   ["Alerts and incidents", "What fired, and why it scored what it did"],
+  behPage:      ["Behaviour intelligence", "What the post has been seeing, by pattern"],
+  mapPage:      ["Map and geofence", "Place each camera, and point it where it looks"],
+  fleetPage:    ["Camera fleet", "Throughput and health, camera by camera"],
+  zonesPage:    ["Zone settings", "Draw the fences this camera watches"],
+};
+
+function homeEveryPanel() {
+  Object.values(PAGES).forEach(spec => {
+    if (!spec) return;
+    const slot = $(spec.home);
+    const panel = $(spec.panel);
+    if (slot && panel && panel.parentElement !== slot) slot.appendChild(panel);
+  });
+}
+
+let view = "dashboard";
+function showView(next) {
+  if (!(next in PAGES)) return;
+  view = next;
+
+  homeEveryPanel();
+  const spec = PAGES[next];
+  if (spec && spec.page) $(spec.page).appendChild($(spec.panel));
+
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("on"));
+  $("view-" + next).classList.add("on");
+  document.querySelectorAll(".nav a").forEach(a =>
+    a.classList.toggle("on", a.dataset.view === next));
+
+  const titles = TITLES[next] || TITLES.dashboard;
+  document.querySelector(".top h2").textContent = titles[0];
+  document.querySelector(".top p").textContent = titles[1];
+
+  syncStreams();                     // stop or start streams for what is on screen now
+  if (next === "zonesPage") openEditor();
+  if (next === "mapPage") openPlacer();
+  window.scrollTo({top: 0, behavior: "smooth"});
+}
+
+document.querySelectorAll(".nav a[data-view]").forEach(a => {
+  a.addEventListener("click", () => showView(a.dataset.view));
+});
+homeEveryPanel();
+
+/* ------------------------------------------------------------ zone editor */
+let zPoints = [];        // corners of the fence being drawn, normalized 0..1
+let zZones = [];         // fences on this camera, saved or pending
+let zDirty = false;
+let zCamera = null;
+
+const KIND_COLOUR = {RESTRICTED: "#f43f5e", WATCH: "#facc15", PATROL: "#38bdf8"};
+
+function zNote(text, bad) {
+  const note = $("zNote");
+  note.textContent = text;
+  note.className = "note on " + (bad ? "bad" : "ok");
+  if (!bad) setTimeout(() => note.classList.remove("on"), 4000);
+}
+
+async function openEditor() {
+  const select = $("zCamera");
+  if (!select.options.length) {
+    try {
+      const status = await get("/api/status");
+      const names = (status.cameras || []).map(c => c.camera_id)
+        .concat((status.skipped || []).map(s => s.camera_id));
+      select.innerHTML = names.length
+        ? names.map(n => "<option>" + esc(n) + "</option>").join("")
+        : "<option value=''>no cameras</option>";
+    } catch (err) { return; }
+  }
+  if (select.value && select.value !== zCamera) await loadCamera(select.value);
+}
+
+async function loadCamera(camera) {
+  zCamera = camera;
+  zPoints = [];
+  zDirty = false;
+  try {
+    const data = await get("/api/cameras/" + encodeURIComponent(camera) + "/zones");
+    zZones = data.zones || [];
+  } catch (err) {
+    zZones = [];
+    zNote("could not read this camera's fences", true);
+  }
+  paintCanvas();
+  paintZoneList();
+}
+
+function paintCanvas() {
+  const canvas = $("zCanvas");
+  const src = "/api/cameras/" + encodeURIComponent(zCamera) + "/snapshot?t=" + Date.now();
+  canvas.innerHTML =
+    '<img id="zShot" alt="' + esc(zCamera) + ' frame" src="' + src + '">' +
+    '<svg id="zOverlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>';
+
+  // A camera that has produced no frame yet cannot be drawn on, and saying so
+  // beats an empty box the operator has to guess about.
+  $("zShot").addEventListener("error", () => {
+    canvas.innerHTML = '<div class="waiting">' + esc(zCamera) +
+      " has produced no frame yet.<br>Start the camera, then refresh the picture.</div>";
+  });
+  paintOverlay();
+}
+
+function paintOverlay() {
+  $("zAdd").disabled = zPoints.length < 3;
+  $("zSave").disabled = !zDirty;
+  const svg = $("zOverlay");
+  if (!svg) return;
+
+  const shapes = zZones.map(z => {
+    const colour = KIND_COLOUR[z.kind] || "#93a3b8";
+    const pts = (z.polygon || []).map(pt => (pt[0] * 100) + "," + (pt[1] * 100)).join(" ");
+    return '<polygon points="' + pts + '" fill="' + colour + '22" stroke="' + colour +
+           '" stroke-width="0.4" vector-effect="non-scaling-stroke"/>';
+  });
+
+  if (zPoints.length) {
+    const pts = zPoints.map(pt => (pt[0] * 100) + "," + (pt[1] * 100)).join(" ");
+    shapes.push(zPoints.length > 2
+      ? '<polygon points="' + pts + '" fill="#22d3ee33" stroke="#22d3ee" ' +
+        'stroke-width="0.5" vector-effect="non-scaling-stroke"/>'
+      : '<polyline points="' + pts + '" fill="none" stroke="#22d3ee" ' +
+        'stroke-width="0.5" vector-effect="non-scaling-stroke"/>');
+    zPoints.forEach(pt => shapes.push(
+      '<circle cx="' + (pt[0] * 100) + '" cy="' + (pt[1] * 100) + '" r="0.9" fill="#22d3ee"/>'));
+  }
+  svg.innerHTML = shapes.join("");
+}
+
+$("zCanvas").addEventListener("click", (ev) => {
+  const shot = $("zShot");
+  if (!shot) return;
+  const box = shot.getBoundingClientRect();
+  const x = (ev.clientX - box.left) / box.width;
+  const y = (ev.clientY - box.top) / box.height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return;
+  zPoints.push([+x.toFixed(4), +y.toFixed(4)]);
+  paintOverlay();
+});
+
+$("zUndo").addEventListener("click", () => { zPoints.pop(); paintOverlay(); });
+$("zClear").addEventListener("click", () => { zPoints = []; paintOverlay(); });
+$("zRefresh").addEventListener("click", () => { if (zCamera) paintCanvas(); });
+$("zCamera").addEventListener("change", (ev) => loadCamera(ev.target.value));
+$("zReload").addEventListener("click", () => { if (zCamera) loadCamera(zCamera); });
+
+$("zAdd").addEventListener("click", () => {
+  if (zPoints.length < 3) return;
+  const name = ($("zName").value || "").trim().toUpperCase();
+  if (!name) { zNote("give the fence a name first", true); return; }
+  if (zZones.some(z => z.name === name)) {
+    zNote("there is already a fence called " + name, true);
+    return;
+  }
+  zZones.push({
+    name: name,
+    kind: $("zKind").value,
+    base_risk: Math.max(0, Math.min(100, parseInt($("zRisk").value, 10) || 50)),
+    description: "Drawn in the dashboard.",
+    objects: $("zObjects").value.split(","),
+    polygon: zPoints,
+  });
+  zPoints = [];
+  $("zName").value = "";
+  zDirty = true;
+  paintZoneList();
+});
+
+function paintZoneList() {
+  const rows = zZones.map((z, i) =>
+    '<div class="zrow">' +
+      '<span class="sw" style="background:' + (KIND_COLOUR[z.kind] || "#93a3b8") + '"></span>' +
+      '<span class="nm">' + esc(z.name) + "</span>" +
+      '<span class="k">' + esc(z.kind) + " &middot; " + z.base_risk + "</span>" +
+      '<button class="btn danger" data-drop="' + i +
+        '" style="padding:2px 8px;font-size:11px">Remove</button>' +
+    "</div>");
+  $("zList").innerHTML = rows.length ? rows.join("")
+    : '<div class="hint">no fences on this camera yet</div>';
+  paintOverlay();
+}
+
+$("zList").addEventListener("click", (ev) => {
+  const button = ev.target.closest("[data-drop]");
+  if (!button) return;
+  zZones.splice(+button.dataset.drop, 1);
+  zDirty = true;
+  paintZoneList();
+});
+
+$("zSave").addEventListener("click", async () => {
+  if (!zCamera) return;
+  $("zSave").disabled = true;
+  try {
+    const response = await fetch("/api/cameras/" + encodeURIComponent(zCamera) + "/zones", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({zones: zZones}),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      // The server validates before writing, so a rejection means nothing was
+      // saved and the camera is still running the fences it had.
+      zNote(result.detail || "the fences were rejected - nothing was saved", true);
+      $("zSave").disabled = false;
+      return;
+    }
+    zDirty = false;
+    zNote(result.applied_live
+      ? "saved " + result.saved + " fence(s) - already in force on " + zCamera
+      : "saved " + result.saved + " fence(s) - applies when " + zCamera + " next starts");
+  } catch (err) {
+    zNote("could not reach the server", true);
+    $("zSave").disabled = false;
+  }
+});
+
+setInterval(() => { $("clock").textContent = new Date().toLocaleTimeString(); }, 1000);
+
+function remember(list) {
+  events = list;
+  list.forEach(e => { byId[e.event_id] = e; });
+  if (mode === "alerts") paintAlerts();
+  paintFeed();
+}
+
+async function poll() {
+  try {
+    const [status, summary, behaviours, incidents] = await Promise.all([
+      get("/api/status"), get("/api/summary"),
+      get("/api/behaviours"), get("/api/incidents"),
     ]);
-    renderStatus(status);
-    const keys = Object.keys(behaviours);
-    $("behaviours").innerHTML = keys.length
-      ? keys.map(k => `<div class="row"><span class="k">${esc(k)}</span><span>${behaviours[k]}</span></div>`).join("")
-      : '<div class="empty">none yet</div>';
-  } catch (e) { /* the fleet may still be starting */ }
+    paintStats(status, summary, incidents);
+    paintFleet(status);
+    paintBehaviours(behaviours);
+    paintCameras(status, window.__siteMap);
+  } catch (err) {
+    // A poll that fails is not a reason to blank a dashboard somebody is
+    // watching. The link indicator already says the connection is down.
+    console.warn("poll failed:", err);
+  }
 }
 
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const ws = new WebSocket(proto + "://" + location.host + "/ws");
 
-  ws.onopen = () => { $("dot").classList.add("on"); $("conn").textContent = "live"; };
-  ws.onclose = () => {
-    $("dot").classList.remove("on");
-    $("conn").textContent = "reconnecting…";
-    setTimeout(connect, 2000);
+  ws.onopen = () => {
+    $("linkDot").className = "dot live";
+    $("linkText").textContent = "operational";
   };
-  ws.onmessage = (msg) => {
-    const data = JSON.parse(msg.data);
-    if (data.type === "snapshot") {
-      renderStatus(data.status);
-      if (view === "alerts") {
-        (data.events || []).slice().reverse().forEach(ev => addAlert(ev, false));
-      }
-    } else if (data.type === "alert") {
-      if (view === "alerts") {
-        addAlert(data.event, true);
-      } else {
-        renderIncidents();
-      }
+  ws.onmessage = (m) => {
+    let msg;
+    try { msg = JSON.parse(m.data); } catch (e) { return; }
+    if (msg.type === "snapshot") {
+      remember(msg.events || []);
+    } else if (msg.type === "alert" && msg.event) {
+      remember([msg.event].concat(events).slice(0, 200));
+      poll();
     }
   };
+  const drop = () => {
+    $("linkDot").className = "dot dead";
+    $("linkText").textContent = "reconnecting";
+    setTimeout(connect, 2500);
+  };
+  ws.onclose = drop;
+  ws.onerror = () => ws.close();
 }
 
+/* --------------------------------------------------------- camera placer */
+// Satellite or street imagery when the browser can reach it, a metre grid when
+// it cannot. Either way positions, directions and saving work the same: a post
+// network with no internet loses the picture, not the tool.
+const R_EARTH = 6371008.8;
+const MW = 900, MH = 560;
+
+let mMap = null;       // the last /api/map payload
+let mSel = null;       // selected camera id
+let mDraft = null;     // the position being edited, not yet saved
+let mDirty = false;
+let mView = null;      // {lat, lon, zoom, w, h}
+let mDrag = null;
+let mPanned = false;
+
+const okLat = (v) => typeof v === "number" && isFinite(v) && v >= -90 && v <= 90;
+const okLon = (v) => typeof v === "number" && isFinite(v) && v >= -180 && v <= 180;
+const hasPos = (d) => d && okLat(d.lat) && okLon(d.lon);
+
+function mNote(text, bad) {
+  const note = $("mNote");
+  note.textContent = text;
+  note.className = "note on " + (bad ? "bad" : "ok");
+  if (!bad) setTimeout(() => note.classList.remove("on"), 5000);
+}
+
+function mPlaced(id) {
+  return ((mMap && mMap.cameras) || []).find(c => c.camera_id === id) || null;
+}
+
+function mCameras() {
+  const ids = ((mMap && mMap.cameras) || []).map(c => c.camera_id)
+    .concat((mMap && mMap.unplaced) || []);
+  return [...new Set(ids)].sort();
+}
+
+function mBase() { return window.__tilesOffline ? null : chosenBasemap(mMap); }
+function mClampZoom(z) {
+  const base = mBase();
+  return Math.max(3, Math.min(base ? (base.max_zoom || 19) : 20, z));
+}
+
+// The same spherical offset the server uses for a wedge, so the preview and
+// the saved result agree.
+function mOffset(lat, lon, bearing, metres) {
+  const d = metres / R_EARTH, b = rad(bearing), p1 = rad(lat), l1 = rad(lon);
+  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
+  const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1),
+                             Math.cos(d) - Math.sin(p1) * Math.sin(p2));
+  return [deg(p2), (deg(l2) + 540) % 360 - 180];
+}
+
+function mBearingTo(lat1, lon1, lat2, lon2) {
+  const p1 = rad(lat1), p2 = rad(lat2), dl = rad(lon2 - lon1);
+  const y = Math.sin(dl) * Math.cos(p2);
+  const x = Math.cos(p1) * Math.sin(p2) - Math.sin(p1) * Math.cos(p2) * Math.cos(dl);
+  return (deg(Math.atan2(y, x)) + 360) % 360;
+}
+
+function mCompass(b) {
+  return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(b / 45) % 8];
+}
+
+function mMetres(m) {
+  return m >= 1000 ? (m / 1000).toFixed(m % 1000 ? 1 : 0) + " km" : Math.round(m) + " m";
+}
+
+// A 360-degree camera has a field of view but no one direction.
+function camMode(c) {
+  if (c.fov != null && c.fov >= 360) return "360";
+  return c.bearing != null && c.fov != null ? "fixed" : "none";
+}
+
+function mCoverage(lat, lon, mode, bearing, fov, reach) {
+  const pts = [];
+  if (mode === "360") {
+    for (let i = 0; i <= 36; i++) pts.push(mOffset(lat, lon, i * 10, reach));
+  } else {
+    pts.push([lat, lon]);
+    for (let i = 0; i <= 16; i++) pts.push(mOffset(lat, lon, bearing - fov / 2 + fov * i / 16, reach));
+    pts.push([lat, lon]);
+  }
+  return pts.map(p => toScreen(mView, p[0], p[1]).map(v => v.toFixed(1)).join(",")).join(" ");
+}
+
+function mFitView() {
+  const pts = [];
+  ((mMap && mMap.cameras) || []).forEach(c => pts.push([c.lat, c.lon]));
+  ((mMap && mMap.geofences) || []).forEach(f => (f.polygon || []).forEach(p => pts.push(p)));
+  if (hasPos(mDraft)) pts.push([mDraft.lat, mDraft.lon]);
+  const base = mBase();
+  mView = fitView(pts, MW, MH, base ? base.max_zoom : 18);
+}
+
+function mInView(lat, lon) {
+  if (!mView) return false;
+  const [x, y] = toScreen(mView, lat, lon);
+  return x > 20 && x < MW - 20 && y > 20 && y < MH - 20;
+}
+
+function mGoTo(lat, lon, zoom) {
+  mView.lat = lat;
+  mView.lon = lon;
+  mView.zoom = mClampZoom(Math.max(mView.zoom, zoom));
+}
+
+async function openPlacer() {
+  try {
+    mMap = await get("/api/map");
+  } catch (err) {
+    mNote("Could not read the map from the server.", true);
+    return;
+  }
+  fillBaseSelect();
+  if (mDirty) { paintPlacer(); return; }          // never throw away an unsaved move
+  const ids = mCameras();
+  selectCamera(ids.includes(mSel) ? mSel : (ids[0] || null), !!mView);
+  if (!mMap.editable) {
+    mNote("This server was started with a single --source, so positions cannot be " +
+          "saved. Run python serve.py to use the fleet file.", true);
+  }
+}
+
+function fillBaseSelect() {
+  const current = chosenBasemap(mMap);
+  $("mBase").innerHTML = ((mMap && mMap.basemaps) || [])
+    .map(b => '<option value="' + esc(b.name) + '">' + esc(b.name) + "</option>").join("") +
+    '<option value="grid">Grid only</option>';
+  $("mBase").value = current ? current.name : "grid";
+}
+
+function selectCamera(id, keepView) {
+  if (mDirty && id !== mSel &&
+      !confirm("Discard the unsaved position for " + mSel + "?")) {
+    paintList();
+    return;
+  }
+  mSel = id;
+  mDirty = false;
+  const c = mPlaced(id);
+  mDraft = c
+    ? {lat: c.lat, lon: c.lon, site: c.site || "", mode: camMode(c),
+       bearing: c.bearing != null ? c.bearing : 0,
+       fov: c.fov != null && c.fov < 360 ? c.fov : 70, height: c.height_m}
+    : {lat: null, lon: null, site: "", mode: "none", bearing: 0, fov: 70, height: null};
+  if (!keepView || !mView) mFitView();
+  else if (hasPos(mDraft) && !mInView(mDraft.lat, mDraft.lon)) mGoTo(mDraft.lat, mDraft.lon, 15);
+  fillForm();
+  paintList();
+  paintPlacer();
+}
+
+function paintList() {
+  const ids = mCameras();
+  $("mList").innerHTML = ids.length ? ids.map(id => {
+    const placed = !!mPlaced(id);
+    return '<button data-cam="' + esc(id) + '" class="' + (id === mSel ? "on" : "") + '">' +
+      "<b>" + esc(id) + "</b>" +
+      '<span class="st' + (placed ? " placed" : "") + '">' +
+      (placed ? "on map" : "not placed") + "</span></button>";
+  }).join("") : '<div class="hint" style="padding:8px">no cameras in this fleet</div>';
+  const placed = ((mMap && mMap.cameras) || []).length;
+  $("mTag").textContent = mMap
+    ? (mMap.editable ? placed + " of " + ids.length + " placed" : "read-only · started with --source")
+    : "";
+}
+
+function fillForm() {
+  const d = mDraft || {};
+  $("mLat").value = okLat(d.lat) ? d.lat : "";
+  $("mLon").value = okLon(d.lon) ? d.lon : "";
+  $("mSite").value = d.site || "";
+  $("mMode").value = d.mode || "none";
+  $("mBearing").value = d.bearing || 0;
+  $("mFov").value = d.fov || 70;
+  $("mHeight").value = d.height != null ? d.height : "";
+  document.querySelectorAll(".aimrow").forEach(r => r.classList.toggle("off", d.mode !== "fixed"));
+  $("mBearingOut").textContent = d.mode === "360" ? "all round"
+    : Math.round(d.bearing || 0) + "° " + mCompass(d.bearing || 0);
+  $("mFovOut").textContent = d.mode === "360" ? "360°" : Math.round(d.fov || 70) + "°";
+  mButtons();
+}
+
+function mButtons() {
+  const editable = !!(mMap && mMap.editable);
+  $("mSave").disabled = !(mSel && mDirty && hasPos(mDraft) && editable);
+  $("mRevert").disabled = !mDirty;
+  $("mRemove").disabled = !(mSel && mPlaced(mSel) && editable);
+}
+
+function paintPlacer() {
+  if (!mMap || !mView) return;
+  mSyncTiles();
+  mPaintOver();
+}
+
+// Tiles are kept and moved rather than redrawn, so dragging the map does not
+// flash every image back to black on each mouse move.
+function mSyncTiles() {
+  const layer = $("mTiles");
+  const keep = new Set();
+  const have = new Map([...layer.children].map(el => [el.getAttribute("data-key"), el]));
+  tilesFor(mView, mBase()).forEach(tile => {
+    let img = have.get(tile.key);
+    if (!img) {
+      img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+      img.setAttribute("data-key", tile.key);
+      img.setAttribute("preserveAspectRatio", "none");
+      img.addEventListener("load", tileLoaded);
+      img.addEventListener("error", tileFailed);
+      img.setAttribute("href", tile.url);
+      layer.appendChild(img);
+    }
+    const size = (tile.size + 0.6).toFixed(1);
+    img.setAttribute("x", tile.x.toFixed(1));
+    img.setAttribute("y", tile.y.toFixed(1));
+    img.setAttribute("width", size);
+    img.setAttribute("height", size);
+    keep.add(tile.key);
+  });
+  have.forEach((el, key) => { if (!keep.has(key)) el.remove(); });
+}
+
+function mPaintOver() {
+  const mpp = metresPerPx(mView.lat, mView.zoom);
+  const span = mpp * MW;
+  const step = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
+                100000, 200000, 500000, 1000000].find(s => span / s <= 9) || 2000000;
+  const stepPx = step / mpp;
+  const base = mBase();
+  let svg = "";
+
+  if (!base) {
+    for (let x = MW / 2 % stepPx; x < MW; x += stepPx)
+      svg += `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${MH}" stroke="#15202d"/>`;
+    for (let y = MH / 2 % stepPx; y < MH; y += stepPx)
+      svg += `<line x1="0" y1="${y.toFixed(1)}" x2="${MW}" y2="${y.toFixed(1)}" stroke="#15202d"/>`;
+  }
+
+  (mMap.geofences || []).forEach(f => {
+    const pts = (f.polygon || []).map(p => toScreen(mView, p[0], p[1]).map(v => v.toFixed(1)).join(",")).join(" ");
+    svg += `<polygon points="${pts}" fill="#f43f5e1a" stroke="#f43f5e" stroke-width="1.6"
+             stroke-dasharray="7 5"/>`;
+    const p0 = (f.polygon || [])[0];
+    if (p0) {
+      const [x, y] = toScreen(mView, p0[0], p0[1]);
+      svg += `<text x="${(x + 7).toFixed(1)}" y="${(y + 17).toFixed(1)}" fill="#fda4af"
+               font-size="12" font-weight="600" letter-spacing="0.08em" ${HALO}>${esc(f.name)}</text>`;
+    }
+  });
+
+  // Big enough to see at any zoom, but never less than the 120 m the server
+  // draws: it shows which way a camera points, not how far it can see.
+  const reach = Math.max(120, 28 * mpp);
+
+  (mMap.cameras || []).forEach(c => {
+    if (c.camera_id === mSel) return;
+    const mode = camMode(c);
+    if (mode !== "none")
+      svg += `<polygon points="${mCoverage(c.lat, c.lon, mode, c.bearing, c.fov, reach)}"
+               fill="#22d3ee26" stroke="#22d3ee99" stroke-width="1.2"/>`;
+    const [x, y] = toScreen(mView, c.lat, c.lon);
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="#22d3eecc"
+             stroke="#05080c" stroke-width="1.5"/>
+            <text x="${x.toFixed(1)}" y="${(y - 11).toFixed(1)}" fill="#e8eef5" font-size="12"
+             text-anchor="middle" ${HALO}>${esc(c.site || c.camera_id)}</text>`;
+  });
+
+  const saved = mPlaced(mSel);
+  if (saved && mDirty && (saved.lat !== mDraft.lat || saved.lon !== mDraft.lon)) {
+    const [x, y] = toScreen(mView, saved.lat, saved.lon);
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="none"
+             stroke="#e8eef5" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  }
+
+  if (hasPos(mDraft)) {
+    if (mDraft.mode !== "none")
+      svg += `<polygon points="${mCoverage(mDraft.lat, mDraft.lon, mDraft.mode, mDraft.bearing, mDraft.fov, reach)}"
+               fill="#22d3ee40" stroke="#22d3ee" stroke-width="1.8"/>`;
+    const [x, y] = toScreen(mView, mDraft.lat, mDraft.lon);
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="none" stroke="#22d3ee"
+             stroke-width="2" ${mDirty ? 'stroke-dasharray="4 3"' : ""}/>
+            <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6.5" fill="#22d3ee"
+             stroke="#05080c" stroke-width="1.5"/>
+            <text x="${x.toFixed(1)}" y="${(y - 19).toFixed(1)}" fill="#ffffff" font-size="13"
+             font-weight="600" text-anchor="middle" ${HALO}>${esc(mDraft.site || mSel)}${mDirty ? " · unsaved" : ""}</text>`;
+  }
+
+  svg += `<g transform="translate(${MW - 34},34)">
+      <circle r="17" fill="#05080cb3"/>
+      <path d="M0,-12 L6,5 L0,1 L-6,5 Z" fill="#e8eef5"/>
+      <text y="14" fill="#e8eef5" font-size="8" text-anchor="middle">N</text></g>
+    <g transform="translate(18,${MH - 24})">
+      <rect x="-8" y="-17" width="${(stepPx + 74).toFixed(1)}" height="30" rx="5" fill="#05080cc7"/>
+      <line x1="0" y1="0" x2="${stepPx.toFixed(1)}" y2="0" stroke="#e8eef5" stroke-width="2"/>
+      <line x1="0" y1="-5" x2="0" y2="5" stroke="#e8eef5" stroke-width="2"/>
+      <line x1="${stepPx.toFixed(1)}" y1="-5" x2="${stepPx.toFixed(1)}" y2="5" stroke="#e8eef5" stroke-width="2"/>
+      <text x="${(stepPx + 9).toFixed(1)}" y="4" fill="#e8eef5" font-size="12">${mMetres(step)}</text></g>`;
+  if (base && base.attribution)
+    svg += `<text x="${MW - 7}" y="${MH - 8}" fill="#e2e8f0" font-size="10" text-anchor="end"
+             ${HALO}>${esc(base.attribution)}</text>`;
+
+  $("mOver").innerHTML = svg;
+}
+
+function mSvgPoint(ev) {
+  const box = $("mSvg").getBoundingClientRect();
+  return [(ev.clientX - box.left) / box.width * MW, (ev.clientY - box.top) / box.height * MH];
+}
+
+function mEdited() {
+  mDirty = true;
+  fillForm();
+  paintPlacer();
+}
+
+$("mCanvas").addEventListener("mousedown", (ev) => {
+  if (!mView || ev.button !== 0) return;
+  mDrag = {x: ev.clientX, y: ev.clientY, zoom: mView.zoom,
+           world: worldPx(mView.lat, mView.lon, mView.zoom), moved: false};
+});
+
+window.addEventListener("mousemove", (ev) => {
+  if (!mDrag || !mView) return;
+  if (!mDrag.moved && Math.hypot(ev.clientX - mDrag.x, ev.clientY - mDrag.y) < 5) return;
+  mDrag.moved = true;
+  if (mDrag.zoom !== mView.zoom) {               // zoomed mid-drag: start again from here
+    mDrag = {x: ev.clientX, y: ev.clientY, zoom: mView.zoom,
+             world: worldPx(mView.lat, mView.lon, mView.zoom), moved: true};
+    return;
+  }
+  const box = $("mSvg").getBoundingClientRect();
+  const dx = (ev.clientX - mDrag.x) / box.width * MW;
+  const dy = (ev.clientY - mDrag.y) / box.height * MH;
+  [mView.lat, mView.lon] = worldLatLon(mDrag.world[0] - dx, mDrag.world[1] - dy, mView.zoom);
+  paintPlacer();
+});
+
+window.addEventListener("mouseup", () => {
+  if (mDrag) { mPanned = mDrag.moved; mDrag = null; }
+});
+
+$("mCanvas").addEventListener("mousemove", (ev) => {
+  if (!mView) return;
+  const [lat, lon] = fromScreen(mView, ...mSvgPoint(ev));
+  $("mCursor").textContent = lat.toFixed(6) + ", " + lon.toFixed(6);
+});
+
+$("mCanvas").addEventListener("mouseleave", () => { $("mCursor").textContent = ""; });
+
+$("mCanvas").addEventListener("click", (ev) => {
+  if (mPanned) { mPanned = false; return; }        // that was a drag, not a click
+  if (!mView || !mSel || !mDraft) return;
+  const [lat, lon] = fromScreen(mView, ...mSvgPoint(ev));
+  if (ev.shiftKey) {
+    if (!hasPos(mDraft)) { mNote("Place the camera first, then shift-click to point it.", true); return; }
+    mDraft.bearing = Math.round(mBearingTo(mDraft.lat, mDraft.lon, lat, lon)) % 360;
+    mDraft.mode = "fixed";
+  } else {
+    mDraft.lat = +lat.toFixed(6);
+    mDraft.lon = +lon.toFixed(6);
+  }
+  mEdited();
+});
+
+$("mCanvas").addEventListener("wheel", (ev) => {
+  if (!mView) return;
+  ev.preventDefault();
+  const point = mSvgPoint(ev);
+  const [lat, lon] = fromScreen(mView, ...point);
+  mView.zoom = mClampZoom(mView.zoom + (ev.deltaY < 0 ? 0.5 : -0.5));
+  // Keep the spot under the cursor still while everything else zooms.
+  const [x, y] = toScreen(mView, lat, lon);
+  const [cx, cy] = worldPx(mView.lat, mView.lon, mView.zoom);
+  [mView.lat, mView.lon] = worldLatLon(cx + x - point[0], cy + y - point[1], mView.zoom);
+  paintPlacer();
+}, {passive: false});
+
+$("mZoomIn").addEventListener("click", () => {
+  if (mView) { mView.zoom = mClampZoom(Math.round(mView.zoom) + 1); paintPlacer(); }
+});
+$("mZoomOut").addEventListener("click", () => {
+  if (mView) { mView.zoom = mClampZoom(Math.round(mView.zoom) - 1); paintPlacer(); }
+});
+$("mFit").addEventListener("click", () => { if (mMap) { mFitView(); paintPlacer(); } });
+$("mIndia").addEventListener("click", () => {
+  if (mMap) { mView = fitView([], MW, MH, 18); paintPlacer(); }
+});
+
+$("mBase").addEventListener("change", (ev) => {
+  try { localStorage.setItem("sentinelx.basemap", ev.target.value); } catch (err) { /* ignore */ }
+  window.__tilesOffline = false;                  // a new choice deserves a new try
+  tilesOk = 0;
+  tilesBad = 0;
+  $("mOffline").hidden = true;
+  $("mTiles").innerHTML = "";
+  if (mView) mView.zoom = mClampZoom(mView.zoom);
+  paintPlacer();
+  if (window.__siteMap) paintMap(window.__siteMap);
+});
+
+$("mList").addEventListener("click", (ev) => {
+  const row = ev.target.closest("[data-cam]");
+  if (row) selectCamera(row.dataset.cam, true);
+});
+
+// Accepts what Google Maps copies ("28.613939, 77.209023") and the degree
+// forms people type ("28.6139° N, 77.2090° E").
+$("mPaste").addEventListener("input", (ev) => {
+  const text = ev.target.value;
+  const nums = text.match(/-?\d+(?:\.\d+)?/g);
+  if (!mDraft || !nums || nums.length < 2) return;
+  let lat = parseFloat(nums[0]), lon = parseFloat(nums[1]);
+  if (/\bS\b|°\s*S/i.test(text)) lat = -Math.abs(lat);
+  if (/\bW\b|°\s*W/i.test(text)) lon = -Math.abs(lon);
+  if (!okLat(lat) || !okLon(lon)) { mNote("Those are not coordinates on Earth.", true); return; }
+  mDraft.lat = +lat.toFixed(7);
+  mDraft.lon = +lon.toFixed(7);
+  if (mView) mGoTo(lat, lon, 17);
+  mEdited();
+});
+
+["mLat", "mLon"].forEach(id => $(id).addEventListener("input", () => {
+  if (!mDraft) return;
+  const lat = parseFloat($("mLat").value), lon = parseFloat($("mLon").value);
+  mDraft.lat = okLat(lat) ? lat : null;
+  mDraft.lon = okLon(lon) ? lon : null;
+  if (mView && hasPos(mDraft) && !mInView(mDraft.lat, mDraft.lon)) mGoTo(mDraft.lat, mDraft.lon, 15);
+  mDirty = true;
+  mButtons();
+  paintPlacer();
+}));
+
+$("mSite").addEventListener("input", (ev) => {
+  if (!mDraft) return;
+  mDraft.site = ev.target.value;
+  mDirty = true; mButtons(); paintPlacer();
+});
+
+$("mMode").addEventListener("change", (ev) => {
+  if (!mDraft) return;
+  mDraft.mode = ev.target.value;
+  mEdited();
+});
+
+$("mBearing").addEventListener("input", (ev) => {
+  if (!mDraft) return;
+  mDraft.bearing = +ev.target.value;
+  mEdited();
+});
+
+$("mFov").addEventListener("input", (ev) => {
+  if (!mDraft) return;
+  mDraft.fov = +ev.target.value;
+  mEdited();
+});
+
+$("mHeight").addEventListener("input", (ev) => {
+  if (!mDraft) return;
+  const h = parseFloat(ev.target.value);
+  mDraft.height = isFinite(h) && h >= 0 ? h : null;
+  mDirty = true; mButtons();
+});
+
+async function mRefresh(id) {
+  mMap = await get("/api/map");
+  window.__siteMap = mMap;
+  paintMap(mMap);                                  // the dashboard overview too
+  mDirty = false;
+  selectCamera(id, true);
+}
+
+$("mSave").addEventListener("click", async () => {
+  if (!mSel || !hasPos(mDraft)) return;
+  $("mSave").disabled = true;
+  const body = {
+    lat: mDraft.lat, lon: mDraft.lon, site: mDraft.site,
+    // "Not surveyed" sends no direction at all: a wedge from a guessed bearing
+    // points confidently at the wrong hillside. A 360-degree camera needs none.
+    bearing: mDraft.mode === "fixed" ? mDraft.bearing : null,
+    fov: mDraft.mode === "fixed" ? mDraft.fov : (mDraft.mode === "360" ? 360 : null),
+    height_m: mDraft.height,
+  };
+  try {
+    const response = await fetch("/api/map/cameras/" + encodeURIComponent(mSel), {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      // The server checks before it writes, so a refusal means nothing changed.
+      mNote("Not saved: " + (result.detail || response.status), true);
+      mButtons();
+      return;
+    }
+    await mRefresh(mSel);
+    mNote(result.warning || (mSel + " saved - it is on the map now"), false);
+  } catch (err) {
+    mNote("Could not reach the server - nothing was saved.", true);
+    mButtons();
+  }
+});
+
+$("mRevert").addEventListener("click", () => {
+  mDirty = false;
+  selectCamera(mSel, true);
+});
+
+$("mRemove").addEventListener("click", async () => {
+  if (!mSel || !confirm("Take " + mSel + " off the map? It keeps running - it only loses its position.")) return;
+  try {
+    const response = await fetch("/api/map/cameras/" + encodeURIComponent(mSel), {method: "DELETE"});
+    const result = await response.json();
+    if (!response.ok) { mNote("Not removed: " + (result.detail || response.status), true); return; }
+    await mRefresh(mSel);
+    mNote(mSel + " is off the map", false);
+  } catch (err) {
+    mNote("Could not reach the server - nothing was changed.", true);
+  }
+});
+
+get("/api/map").then(m => { window.__siteMap = m; paintMap(m); }).catch(() => {});
+poll();
 connect();
-refreshSide();
-setInterval(refreshSide, 2000);
+setInterval(poll, 3000);
 </script>
 </body>
 </html>

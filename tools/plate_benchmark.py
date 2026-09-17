@@ -270,7 +270,7 @@ def use_paddle(engine: ANPREngine) -> None:
     reader = PaddleOCR(use_textline_orientation=False, lang="en",
                        enable_mkldnn=False)
 
-    def detect(self, image):
+    def detect(self, image, localised=True):
         try:
             pages = reader.predict(image)
         except Exception:
@@ -307,7 +307,7 @@ def use_paddle_rec(engine: ANPREngine) -> None:
 
     reader = TextRecognition()
 
-    def detect(self, image):
+    def detect(self, image, localised=True):
         try:
             results = reader.predict(image)
         except Exception:

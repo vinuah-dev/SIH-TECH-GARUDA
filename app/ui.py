@@ -1,4 +1,4 @@
-"""Terminal branding, colours and structured logging for IBVAP.
+"""Terminal branding, colours and structured logging for SENTINEL-X.
 
 Deliberately dependency-free: ANSI escapes only, with a hard switch for
 terminals (or piped output) that cannot render them.
@@ -109,7 +109,7 @@ def error(message: str) -> None:
 def banner() -> None:
     print()
     print(c(_SEP, "cyan"))
-    print(c(" IBVAP - INTELLIGENT BORDER VIDEO ANALYTICS".ljust(WIDTH), "bold", "cyan"))
+    print(c(" SENTINEL-X  |  INTELLIGENT BORDER SURVEILLANCE".ljust(WIDTH), "bold", "cyan"))
     print(c(" Ministry of Home Affairs | Sashastra Seema Bal".ljust(WIDTH), "dim"))
     print(c(_SEP, "cyan"))
     print()
