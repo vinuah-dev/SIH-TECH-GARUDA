@@ -12,7 +12,7 @@ so border posts get analytics without replacing cameras with expensive smart har
 VIDEO → DETECTION → TRACKING → ZONES → CONTEXT → BEHAVIOUR → RISK → ALERT → EVIDENCE
 ```
 
-**1001 automated tests.** Every claim below is qualified by whether it has been run
+**1067 automated tests.** Every claim below is qualified by whether it has been run
 against real footage or only against a test rig — see
 [What is proven, and what is not](#what-is-proven-and-what-is-not).
 
@@ -161,6 +161,28 @@ that does not answer is skipped at startup, and its tile says why.
 
 From the dashboard itself:
 
+* **Add a camera** — *+ Add camera* on *Camera fleet* or *Live surveillance*. Pick what it
+  is and fill in what you know; the camera address is built for you:
+
+  | Kind | What you fill in | Connects to |
+  | --- | --- | --- |
+  | Webcam — USB or built-in | its number (*Find webcams* lists the ones that answer) | `webcam:1` |
+  | IP camera — Wi-Fi or LAN cable | brand, IP, login, main or sub stream | `rtsp://admin:***@192.168.1.64:554/Streaming/Channels/102` |
+  | CCTV via DVR / NVR — wired cameras | brand, the DVR's IP, login, channel | `rtsp://admin:***@192.168.1.108:554/cam/realmonitor?channel=3&subtype=1` |
+  | Stream link — phone app or any URL | the link (IP Webcam app: `http://PHONE-IP:8080/video`) | as typed |
+  | Demo feed | nothing | a generated test scene, labelled *Demo feed* |
+
+  Brands built in: Hikvision / Prama, CP Plus / Dahua, Uniview, TP-Link Tapo; *Other brand*
+  takes the stream path from the camera's manual. *Test connection* opens the camera and
+  shows one picture — or says whether nothing answered, the login was refused, or it
+  connected and sent no picture. *Add camera* saves it into `config/cameras.json` and starts
+  it at once, no restart. A camera that is not answering is still saved, shown offline
+  with the reason, and tried again on the next restart. The **×** beside a camera in
+  *Camera fleet* stops it and deletes it from the file.
+
+  The login is stored in `config/cameras.json` in plain text, because the camera needs it to
+  stream. The dashboard, the API and the console never show the password — but do not
+  push that file anywhere public with a real password in it.
 * **Put cameras on the map** — *Map & geofence* opens a satellite map of India. Pick a
   camera, click where it stands or paste its coordinates (Google Maps: right-click the
   spot, click the numbers), then set its coverage: *points one way* (shift-click the
@@ -186,7 +208,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-1001 tests. None of them need a camera, a model or a network.
+1067 tests. None of them need a camera, a model or a network.
 
 ### If something goes wrong
 
@@ -201,7 +223,11 @@ python -m pytest tests/ -q
 
 **Security.** The API has **no authentication**. It binds to 127.0.0.1 by default for that
 reason, and `--host 0.0.0.0` warns before exposing it. Put it behind a VPN or an
-authenticating reverse proxy before it leaves the machine.
+authenticating reverse proxy before it leaves the machine. Anyone who can reach the port
+can add or remove cameras, so this matters more than it did. What the API does guard: a
+camera added from the dashboard can only be a webcam number, an `rtsp://`/`http(s)://`
+address or the demo feed — never a file path; only a camera name and source are taken
+from the request; and a write sent from another website's page is refused.
 
 ---
 
@@ -325,7 +351,7 @@ sentinelx/
 │
 ├── config/                    # cameras (cameras-demo.json needs no hardware), zones, registry
 ├── data/                      # samples, evidence, event logs
-├── tests/                     # 1001 tests, no model or camera required
+├── tests/                     # 1067 tests, no model or camera required
 ├── main.py                    # CLI entrypoint
 └── serve.py                   # server entrypoint
 ```
@@ -397,6 +423,10 @@ python serve.py --host 0.0.0.0 --port 8080
 | `/api/incidents` | Events grouped into incidents, not one row per alert |
 | `/api/map` | Every camera's position, direction wedge and surrounding areas |
 | `/api/map/cameras/{id}` | `GET` one camera and its nearest neighbours · `PUT` place or move it · `DELETE` take it off the map |
+| `/api/cameras` | `POST {"camera_id", "source"}` add a camera to the fleet file and start it |
+| `/api/cameras/{id}` | `DELETE` stop a camera and remove it from the fleet file |
+| `/api/cameras/test` | `POST {"source"}` open a camera, return one picture or the reason it failed |
+| `/api/cameras/webcams` | `POST` which webcam numbers have a camera behind them |
 | `/api/cameras/{id}/zones` | `GET` / `PUT` the fences drawn on one camera |
 | `/api/cameras/{id}/stream` | The annotated view, as MJPEG |
 | `/api/cameras/{id}/snapshot` | One annotated still |
@@ -1099,7 +1129,7 @@ pip install -r requirements-dev.txt
 python -m pytest tests/ -q
 ```
 
-1001 tests, none of which need a model, a camera or a network. Highlights of what they
+1067 tests, none of which need a model, a camera or a network. Highlights of what they
 pin down rather than merely cover:
 
 * A person standing exactly on a fence line counts as inside it.
@@ -1282,7 +1312,7 @@ note below it, because the project has since travelled a long way past that brie
 * Cameras placed on a satellite map of India from the dashboard — fixed direction or
   360° — saved to the fleet file, with a grid fallback when there is no internet
 * SHA-256 hash-chained event log: editing or deleting a past event is detectable
-* 1001 automated tests, none needing a model, a camera or a network
+* 1067 automated tests, none needing a model, a camera or a network
 
 ### NEXT
 

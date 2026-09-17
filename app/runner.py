@@ -27,6 +27,7 @@ import numpy as np
 
 from . import ui
 from .alerts.events import IntrusionEvent
+from .camera_sources import describe_source, redact_source
 from .anpr import PlateLedger
 from .tracking import PersonLedger
 from .config import SurveillanceConfig
@@ -197,7 +198,9 @@ class CameraWorker:
         health = self.pipeline._source_health
         return {
             "camera_id": self.spec.camera_id,
-            "source": self.spec.source,
+            # Never the raw source: a camera address can carry its password.
+            "source": redact_source(self.spec.source),
+            "label": describe_source(self.spec.source),
             "running": self.alive,
             "frames": stats.frames,
             "detections": stats.detections,
@@ -223,7 +226,7 @@ class CameraWorker:
             return None
         return (
             f"opened but delivered no frames - another program may be using "
-            f"{self.spec.source}, or it has no video to give"
+            f"{redact_source(self.spec.source)}, or it has no video to give"
         )
 
 
@@ -259,6 +262,9 @@ class MultiCameraRunner:
         # annotated frames here and the main loop draws them.
         self._frames: dict[str, Any] = {}
         self._frame_lock = threading.Lock()
+        # Cameras can join and leave while the fleet runs; one change at a time.
+        self._change_lock = threading.RLock()
+        self._model_ready = False
 
     # ------------------------------------------------------------------ setup
 
@@ -325,23 +331,71 @@ class MultiCameraRunner:
                 ui.warn(f"Skipping {spec.camera_id}: {reason}")
         return usable
 
+    def _build_worker(self, spec: CameraSpec) -> CameraWorker:
+        config = spec.build_config(self.base_config)
+        detector = self.detector if self.shared else self._make_detector(config)
+        pipeline = SurveillancePipeline(
+            config,
+            event_hooks=self.event_hooks,
+            store=self.store,
+            detector=detector,
+            frame_sink=(self._post_frame
+                        if config.view or self.capture_frames else None),
+            plate_ledger=self.plate_ledger,
+            person_ledger=self.person_ledger,
+        )
+        return CameraWorker(spec=spec, pipeline=pipeline)
+
     def _build_workers(self) -> list[CameraWorker]:
-        workers = []
-        for spec in self.specs:
-            config = spec.build_config(self.base_config)
-            detector = self.detector if self.shared else self._make_detector(config)
-            pipeline = SurveillancePipeline(
-                config,
-                event_hooks=self.event_hooks,
-                store=self.store,
-                detector=detector,
-                frame_sink=(self._post_frame
-                            if config.view or self.capture_frames else None),
-                plate_ledger=self.plate_ledger,
-                person_ledger=self.person_ledger,
-            )
-            workers.append(CameraWorker(spec=spec, pipeline=pipeline))
-        return workers
+        return [self._build_worker(spec) for spec in self.specs]
+
+    # ------------------------------------------------- joining and leaving
+
+    def add_camera(self, spec: CameraSpec) -> tuple[bool, str]:
+        """Bring one more camera into the running fleet. (running, reason).
+
+        It shares the model already in memory, like the cameras the fleet
+        started with. A camera that does not answer is recorded as skipped -
+        exactly what startup does - rather than refused, so the dashboard shows
+        it offline with the reason, and the next restart tries it again.
+        """
+        with self._change_lock:
+            taken = {s.camera_id for s in self.specs} | {cid for cid, _ in self.skipped}
+            if spec.camera_id in taken:
+                raise ValueError(f"there is already a camera called {spec.camera_id}")
+            ok, reason = self._reachable(spec)
+            if not ok:
+                self.skipped.append((spec.camera_id, reason))
+                ui.warn(f"Added {spec.camera_id}, but it is offline: {reason}")
+                return False, reason
+            if not self._model_ready:
+                # The fleet started with no camera answering, so no model yet.
+                self.detector = self._build_shared_detector()
+                self._model_ready = True
+            worker = self._build_worker(spec)
+            self.specs.append(spec)
+            self.workers.append(worker)
+            ui.info(f"   + {spec.camera_id:<10} {redact_source(spec.source)}")
+            worker.start()
+            return True, ""
+
+    def remove_camera(self, camera_id: str, timeout: float = 5.0) -> bool:
+        """Stop one camera and take it out of the fleet. True if it was running."""
+        with self._change_lock:
+            self.skipped = [(cid, why) for cid, why in self.skipped if cid != camera_id]
+            self.specs = [s for s in self.specs if s.camera_id != camera_id]
+            worker = next((w for w in self.workers if w.spec.camera_id == camera_id), None)
+            if worker is not None:
+                self.workers = [w for w in self.workers if w is not worker]
+        if worker is None:
+            return False
+        worker.pipeline.request_stop()
+        if worker.thread is not None:
+            worker.thread.join(timeout=timeout)
+        with self._frame_lock:
+            self._frames.pop(camera_id, None)
+        ui.info(f"   - {camera_id:<10} removed from the fleet")
+        return True
 
     # -------------------------------------------------------------------- run
 
@@ -391,6 +445,7 @@ class MultiCameraRunner:
             ui.info(f"Running {len(self.specs)} of the configured cameras.")
         ui.info("Loading AI Vision Engine (shared across all cameras)...")
         self.detector = self._build_shared_detector()
+        self._model_ready = True
         if self.shared and self.detector is not None:
             ui.ok(f"Model loaded once, shared by every camera: {self.detector.name}")
         else:
@@ -401,7 +456,7 @@ class MultiCameraRunner:
 
         self.workers = self._build_workers()
         for worker in self.workers:
-            ui.info(f"   - {worker.spec.camera_id:<10} {worker.spec.source}")
+            ui.info(f"   - {worker.spec.camera_id:<10} {redact_source(worker.spec.source)}")
             worker.start()
         print()
         return self.workers

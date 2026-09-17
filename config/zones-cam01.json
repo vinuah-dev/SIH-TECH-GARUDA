@@ -3,8 +3,8 @@
   "_comment": "Drawn in the SENTINEL-X dashboard.",
   "zones": [
     {
-      "name": "GATE",
-      "kind": "WATCH",
+      "name": "RES",
+      "kind": "RESTRICTED",
       "base_risk": 60,
       "description": "Drawn in the dashboard.",
       "objects": [
@@ -13,20 +13,20 @@
       ],
       "polygon": [
         [
-          0.6189,
-          0.2995
+          0.6326,
+          0.3092
         ],
         [
-          0.9447,
-          0.301
+          0.9618,
+          0.2951
         ],
         [
-          0.955,
-          0.9854
+          0.9772,
+          0.9471
         ],
         [
-          0.6486,
-          0.9945
+          0.6557,
+          0.9715
         ]
       ]
     }

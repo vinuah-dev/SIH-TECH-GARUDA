@@ -116,6 +116,12 @@ body{
   border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:12.5px;
   font-family:inherit}
 .field input:focus,.field select:focus{outline:none;border-color:var(--accent-dim)}
+/* Shown when the server has a newer dashboard than this tab. */
+.updated{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:60;
+  display:flex;align-items:center;gap:12px;background:#0c2a33;border:1px solid #1d6f80;
+  color:var(--ink);padding:8px 8px 8px 14px;border-radius:8px;font-size:12.5px;
+  box-shadow:0 10px 28px #000a}
+.updated[hidden]{display:none}
 .btn{background:var(--accent-dim);color:#e8feff;border:none;border-radius:6px;
      padding:8px 14px;font-size:12.5px;cursor:pointer;font-family:inherit;font-weight:500}
 .btn:hover{background:#0891a8}
@@ -187,15 +193,34 @@ body{
 
 /* ------------------------------------------------------------------- map */
 .mapwrap{padding:13px 14px}
-svg.map{width:100%;height:auto;display:block;background:#070d14;
-        border:1px solid var(--line);border-radius:7px}
-.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:11px;color:var(--ink-3)}
-.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;
-          margin-right:5px;vertical-align:middle}
+.mapbox{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;
+        background:#070d14;user-select:none;cursor:grab}
+.mapbox.placing{cursor:crosshair}
+.mapbox.dragging{cursor:grabbing}
+.mapbox > svg{display:block;width:100%;height:auto}
+/* Imagery toned down to sit inside a dark console instead of glaring out of it. */
+.maptiles{filter:brightness(.74) saturate(.82) contrast(1.06)}
+.mapctl{position:absolute;left:9px;top:9px;display:flex;flex-direction:column;gap:5px}
+.mapctl button{width:28px;height:28px;display:grid;place-items:center;padding:0;
+  background:#0b1119e8;color:var(--ink);border:1px solid #2a3749;border-radius:6px;
+  font:600 17px/1 "Segoe UI",system-ui,sans-serif;cursor:pointer}
+.mapctl button:hover{background:#16202c;border-color:#3d4d63}
+.mapctl svg{width:15px;height:15px}
+.layermenu{position:absolute;left:44px;top:75px;z-index:3;min-width:132px;padding:4px;
+  background:#0b1119f5;border:1px solid #2a3749;border-radius:7px}
+.layermenu button{display:block;width:100%;text-align:left;background:none;border:none;
+  color:var(--ink-2);padding:6px 9px;border-radius:5px;font:inherit;font-size:12px;cursor:pointer}
+.layermenu button:hover{background:#16202c;color:var(--ink)}
+.layermenu button.on{color:var(--accent)}
+.mapnote{position:absolute;left:46px;top:9px;right:9px;background:#0a0f16eb;
+  border:1px solid #5a4514;color:var(--medium);font-size:12px;line-height:1.5;
+  padding:7px 10px;border-radius:6px;pointer-events:none}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11.5px;color:var(--ink-3)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend svg{width:11px;height:15px}
+.legend i{display:inline-block;width:12px;height:9px;border-radius:2px}
 
 /* --------------------------------------------------------- camera placer */
-.mapcanvas{background:#070d14;user-select:none}
-.mapcanvas svg{position:static;display:block;width:100%;height:auto}
 .readout{margin-left:auto;align-self:center;font-size:11.5px;color:var(--ink-3);
          font-variant-numeric:tabular-nums}
 .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -208,17 +233,10 @@ svg.map{width:100%;height:auto;display:block;background:#070d14;
 .plist button.on{background:#0c2a33;color:var(--ink)}
 .plist .st{margin-left:auto;font-size:10.5px;color:var(--ink-3)}
 .plist .st.placed{color:var(--ok)}
-.check{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);
-       margin:2px 0 11px;cursor:pointer}
 .field input[type=range]{padding:0;border:none;background:none;accent-color:var(--accent)}
 .field label span{color:var(--ink);text-transform:none;letter-spacing:0;font-weight:500}
 .aimrow.off{opacity:.38;pointer-events:none}
 .hint code{font-size:11.5px;color:var(--ink-2)}
-.mselect{background:var(--panel-2);color:var(--ink-2);border:1px solid var(--line);
-  border-radius:6px;padding:6px 9px;font-size:12.5px;font-family:inherit}
-.mapnote{position:absolute;left:10px;top:10px;right:10px;background:#0a0f16eb;
-  border:1px solid #5a4514;color:var(--medium);font-size:12px;line-height:1.5;
-  padding:8px 11px;border-radius:6px;pointer-events:none}
 
 /* ----------------------------------------------------------------- fleet */
 table{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -227,6 +245,38 @@ th{text-align:left;font-size:10px;letter-spacing:.09em;text-transform:uppercase;
 td{padding:9px 14px;border-bottom:1px solid var(--line);color:var(--ink-2)}
 tr:last-child td{border-bottom:none}
 td.num{font-variant-numeric:tabular-nums;color:var(--ink)}
+
+/* ------------------------------------------------------------ add camera */
+[hidden]{display:none !important}
+.btn.sm{padding:4px 10px;font-size:11.5px}
+.modal.addcam{max-width:700px}
+.kinds{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:15px}
+@media(max-width:680px){.kinds{grid-template-columns:repeat(2,1fr)}}
+.kind{display:flex;flex-direction:column;gap:3px;text-align:left;background:var(--panel-2);
+  border:1px solid var(--line);border-radius:7px;padding:9px 10px;cursor:pointer;
+  font-family:inherit;color:var(--ink-3)}
+.kind b{font-size:12.5px;font-weight:600;color:var(--ink)}
+.kind span{font-size:10.5px;line-height:1.35}
+.kind:hover{border-color:#2a3749}
+.kind.on{border-color:var(--accent-dim);background:#0d2630}
+.kind.on b{color:var(--accent)}
+.inline{display:flex;gap:8px}
+.inline select{flex:1}
+.found{display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 10px}
+.ackind > .hint{margin-bottom:12px}
+.found .tab[disabled]{opacity:.5;cursor:not-allowed}
+.acsource{display:flex;gap:9px;align-items:baseline;font-size:11.5px;color:var(--ink-3);
+  margin:0 0 4px;word-break:break-all}
+.acsource code{color:var(--ink-2);font-size:11.5px}
+.acpreview{margin-top:12px;border:1px solid var(--line);border-radius:7px;overflow:hidden;
+  background:#070b11}
+.acpreview img{display:block;width:100%}
+.acdone{display:flex;flex-direction:column;gap:6px}
+td .srcl{display:block;font-size:10.5px;color:var(--ink-3);margin-top:2px}
+td.rm{width:34px;padding:0 10px 0 0;text-align:right}
+td.rm button{background:none;border:none;color:var(--ink-3);font-size:17px;line-height:1;
+  cursor:pointer;padding:2px 4px}
+td.rm button:hover{color:var(--critical)}
 
 /* ------------------------------------------------------------------ feed */
 .feed{display:flex;align-items:center;gap:12px;padding:9px 20px;
@@ -269,6 +319,10 @@ h4.sec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
 </style>
 </head>
 <body>
+<div class="updated" id="updated" hidden>
+  <span>The dashboard was updated on the server.</span>
+  <button class="btn" id="updReload">Reload</button>
+</div>
 <div class="shell">
   <aside class="side">
     <div class="brand">
@@ -341,23 +395,10 @@ h4.sec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
 
             <div class="zed" style="margin-top:13px">
               <div>
-                <div class="canvas mapcanvas" id="mCanvas">
-                  <svg id="mSvg" viewBox="0 0 900 560" role="img">
-                    <title>Camera positions: click to place, shift-click to aim</title>
-                    <rect width="900" height="560" fill="#070d14"/>
-                    <g id="mTiles"></g>
-                    <g id="mOver"></g>
-                  </svg>
-                  <div class="mapnote" id="mOffline" hidden>Map imagery could not load —
-                    probably no internet on this network. Everything still works on the
-                    grid, and positions still save.</div>
-                </div>
+                <div class="mapbox placing" id="mCanvas"></div>
                 <div class="btnrow">
-                  <button class="btn ghost" id="mZoomIn">Zoom in</button>
-                  <button class="btn ghost" id="mZoomOut">Zoom out</button>
                   <button class="btn ghost" id="mFit">Fit all cameras</button>
                   <button class="btn ghost" id="mIndia">All India</button>
-                  <select class="mselect" id="mBase" title="Map background"></select>
                   <span class="readout" id="mCursor"></span>
                 </div>
               </div>
@@ -488,7 +529,8 @@ h4.sec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
       <div id="panelHome" style="display:none">
         <section class="panel" id="cams">
           <header><h3>Live surveillance</h3><div class="spacer"></div>
-            <span class="tag" id="camTag">&nbsp;</span></header>
+            <span class="tag" id="camTag">&nbsp;</span>
+            <button class="btn sm addcam-open" hidden>+ Add camera</button></header>
           <div class="cams" id="camGrid"><div class="empty">waiting for the fleet…</div></div>
         </section>
 
@@ -507,12 +549,23 @@ h4.sec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
         <section class="panel" id="map">
           <header><h3>Map &amp; geofence</h3><div class="spacer"></div>
             <span class="tag" id="mapTag">&nbsp;</span></header>
-          <div class="mapwrap" id="mapWrap"><div class="empty">no camera locations surveyed</div></div>
+          <div class="mapwrap">
+            <div id="mapWrap"></div>
+            <div class="legend">
+              <span><svg viewBox="-11 -30 22 31" aria-hidden="true"><path d="M0,0 C-2.5,-6 -10,-11 -10,-19 A10,10 0 1 1 10,-19 C10,-11 2.5,-6 0,0 Z" fill="#22c55e"/></svg>Camera</span>
+              <span><svg viewBox="-11 -30 22 31" aria-hidden="true"><path d="M0,0 C-2.5,-6 -10,-11 -10,-19 A10,10 0 1 1 10,-19 C10,-11 2.5,-6 0,0 Z" fill="#ef4444"/></svg>Alert · last 10 min</span>
+              <span><svg viewBox="-11 -30 22 31" aria-hidden="true"><path d="M0,0 C-2.5,-6 -10,-11 -10,-19 A10,10 0 1 1 10,-19 C10,-11 2.5,-6 0,0 Z" fill="#64748b"/></svg>Offline</span>
+              <span><i style="background:#ef44442e;border:1.5px solid #ef4444"></i>Geofence</span>
+              <span><i style="background:#22d3ee2e;border:1.5px solid #22d3ee"></i>Coverage</span>
+            </div>
+          </div>
         </section>
 
         <section class="panel" id="fleet">
-          <header><h3>Camera fleet</h3></header>
+          <header><h3>Camera fleet</h3><div class="spacer"></div>
+            <button class="btn sm addcam-open" hidden>+ Add camera</button></header>
           <div id="fleetWrap"><div class="empty">waiting…</div></div>
+          <div class="note" id="fleetNote" style="margin:0 14px 12px"></div>
         </section>
       </div>
     </div>
@@ -520,6 +573,132 @@ h4.sec{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
     <div class="feed">
       <span class="lbl"><span class="dot live"></span>LIVE FEED</span>
       <div class="items" id="feedItems"><span>waiting for events…</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------------------------------------------------- add camera -->
+<div class="scrim" id="addScrim">
+  <div class="modal addcam" role="dialog" aria-labelledby="acTitle">
+    <header>
+      <h3 id="acTitle">Add camera</h3>
+      <button class="x" id="acClose" aria-label="Close">&times;</button>
+    </header>
+    <div class="pad" id="acForm">
+      <div class="kinds" id="acKinds">
+        <button class="kind on" data-kind="webcam"><b>Webcam</b><span>USB or built-in</span></button>
+        <button class="kind" data-kind="ip"><b>IP camera</b><span>Wi-Fi or LAN cable</span></button>
+        <button class="kind" data-kind="dvr"><b>CCTV via DVR</b><span>wired cameras on a DVR / NVR</span></button>
+        <button class="kind" data-kind="url"><b>Stream link</b><span>phone app or any URL</span></button>
+        <button class="kind" data-kind="demo"><b>Demo feed</b><span>no camera needed</span></button>
+      </div>
+
+      <div class="ackind" data-for="webcam">
+        <div class="field">
+          <label for="acIndex">Webcam number</label>
+          <div class="inline">
+            <select id="acIndex">
+              <option value="0">0 — usually the built-in camera</option>
+              <option value="1">1 — usually the first USB camera</option>
+              <option value="2">2</option><option value="3">3</option><option value="4">4</option>
+              <option value="5">5</option><option value="6">6</option><option value="7">7</option>
+              <option value="8">8</option><option value="9">9</option>
+            </select>
+            <button class="btn ghost" id="acFind">Find webcams</button>
+          </div>
+        </div>
+        <div class="found" id="acFound"></div>
+        <p class="hint">Finding webcams switches each one on for a moment to see if it answers.</p>
+      </div>
+
+      <div class="ackind" data-for="ip dvr">
+        <div class="field">
+          <label for="acBrand">Brand</label>
+          <select id="acBrand">
+            <option value="hikvision">Hikvision / Prama</option>
+            <option value="dahua">CP Plus / Dahua</option>
+            <option value="uniview">Uniview</option>
+            <option value="tapo">TP-Link Tapo</option>
+            <option value="custom">Other brand — type the stream path</option>
+          </select>
+        </div>
+        <div class="pair">
+          <div class="field">
+            <label for="acHost" id="acHostLabel">Camera IP address</label>
+            <input id="acHost" placeholder="192.168.1.64" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="acPort">RTSP port</label>
+            <input id="acPort" type="number" min="1" max="65535" value="554">
+          </div>
+        </div>
+        <div class="pair">
+          <div class="field">
+            <label for="acUser">Username</label>
+            <input id="acUser" placeholder="admin" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="acPass">Password</label>
+            <input id="acPass" type="password" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="pair">
+          <div class="field" id="acChanField">
+            <label for="acChan">Channel (camera number on the DVR)</label>
+            <input id="acChan" type="number" min="1" max="64" value="1">
+          </div>
+          <div class="field" id="acStreamField">
+            <label for="acStream">Stream</label>
+            <select id="acStream">
+              <option value="sub">Sub stream — lighter, more cameras per PC</option>
+              <option value="main">Main stream — sharper, reads plates better</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" id="acPathField">
+          <label for="acPath">Stream path</label>
+          <input id="acPath" placeholder="/stream1 — see the camera's manual" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="ackind" data-for="url">
+        <div class="field">
+          <label for="acUrl">Stream link</label>
+          <input id="acUrl" placeholder="http://192.168.1.20:8080/video" autocomplete="off">
+        </div>
+        <p class="hint">Phone with the <b>IP Webcam</b> app: <code>http://PHONE-IP:8080/video</code>.
+          Any <code>rtsp://</code>, <code>http://</code> or <code>https://</code> camera link works.</p>
+      </div>
+
+      <div class="ackind" data-for="demo">
+        <p class="hint">A moving test scene made on the server — for showing the system without a
+          camera. It is labelled <b>Demo feed</b> everywhere, so nobody mistakes it for a real one.</p>
+      </div>
+
+      <div class="field">
+        <label for="acId">Camera name</label>
+        <input id="acId" maxlength="32" placeholder="CAM-03" autocomplete="off">
+      </div>
+      <div class="acsource"><span>Connects to</span><code id="acSource">—</code></div>
+
+      <div class="acpreview" id="acPreview" hidden></div>
+      <div class="btnrow">
+        <button class="btn ghost" id="acTest">Test connection</button>
+        <button class="btn" id="acAdd">Add camera</button>
+      </div>
+      <div class="note" id="acNote"></div>
+      <p class="hint" id="acCreds" hidden style="margin-top:10px">The login is saved in the
+        fleet file (<code>config/cameras.json</code>) because the camera needs it to stream.
+        Do not upload that file anywhere public with a real password in it.</p>
+    </div>
+
+    <div class="pad acdone" id="acDone" hidden>
+      <div class="note on" id="acDoneNote"></div>
+      <div class="btnrow">
+        <button class="btn" id="acPlace">Place it on the map</button>
+        <button class="btn ghost" id="acAnother">Add another camera</button>
+        <button class="btn ghost" id="acFinish">Done</button>
+      </div>
     </div>
   </div>
 </div>
@@ -737,12 +916,16 @@ function paintBehaviours(counts) {
 // Web Mercator - the projection every web map uses - so imagery tiles and the
 // cameras drawn on top of them line up at every zoom, from all of India down
 // to a single gate. Tiles are plain <image> elements: no map library, nothing
-// to load from a CDN.
+// loaded from a CDN.
 const TILE = 256;
 const MAX_LAT = 85.0511;
 const INDIA = [[6.5, 68.1], [37.1, 97.4]];
+const R_EARTH = 6371008.8;
+const STEPS = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
+               100000, 200000, 500000, 1000000];
 const rad = (d) => d * Math.PI / 180;
 const deg = (r) => r * 180 / Math.PI;
+const HALO = 'paint-order="stroke" stroke="#05080c" stroke-width="3" stroke-linejoin="round"';
 
 function worldPx(lat, lon, zoom) {
   const size = TILE * Math.pow(2, zoom);
@@ -782,6 +965,13 @@ function fitView(points, w, h, maxZoom) {
   return {lat, lon, w, h, zoom: Math.max(3, Math.min(maxZoom || 18, 17, fit))};
 }
 
+function sitePoints(m) {
+  const pts = [];
+  ((m && m.cameras) || []).forEach(c => pts.push([c.lat, c.lon]));
+  ((m && m.geofences) || []).forEach(f => (f.polygon || []).forEach(p => pts.push(p)));
+  return pts;
+}
+
 // The tiles covering a view, taken from the nearest whole zoom and scaled.
 function tilesFor(view, basemap) {
   if (!basemap) return [];
@@ -804,12 +994,50 @@ function tilesFor(view, basemap) {
   return out;
 }
 
+// Tiles are kept and moved rather than redrawn, so dragging does not flash
+// every image back to black on each mouse move.
+function syncTiles(layer, view, basemap) {
+  const keep = new Set();
+  const have = new Map([...layer.children].map(el => [el.getAttribute("data-key"), el]));
+  tilesFor(view, basemap).forEach(tile => {
+    let img = have.get(tile.key);
+    if (!img) {
+      img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+      img.setAttribute("data-key", tile.key);
+      img.setAttribute("preserveAspectRatio", "none");
+      img.addEventListener("load", tileLoaded);
+      img.addEventListener("error", tileFailed);
+      img.setAttribute("href", tile.url);
+      layer.appendChild(img);
+    }
+    const size = (tile.size + 0.6).toFixed(1);
+    img.setAttribute("x", tile.x.toFixed(1));
+    img.setAttribute("y", tile.y.toFixed(1));
+    img.setAttribute("width", size);
+    img.setAttribute("height", size);
+    keep.add(tile.key);
+  });
+  have.forEach((el, key) => { if (!keep.has(key)) el.remove(); });
+}
+
 function chosenBasemap(m) {
   const maps = (m && m.basemaps) || [];
   let name = null;
   try { name = localStorage.getItem("sentinelx.basemap"); } catch (err) { /* private window */ }
   if (name === "grid") return null;
   return maps.find(b => b.name === name) || maps[0] || null;
+}
+
+function setBasemap(name) {
+  try { localStorage.setItem("sentinelx.basemap", name); } catch (err) { /* ignore */ }
+  window.__tilesOffline = false;                  // a new choice deserves a new try
+  tilesOk = 0;
+  tilesBad = 0;
+  SxMap.all.forEach(map => {
+    map.tiles.innerHTML = "";
+    if (map.view) map.view.zoom = map.clamp(map.view.zoom);
+    map.paint();
+  });
 }
 
 // One bad tile is a hole in coverage. Several, and not one good, is a network
@@ -821,101 +1049,631 @@ function tileFailed() {
   tilesBad++;
   if (tilesOk || tilesBad < 4 || window.__tilesOffline) return;
   window.__tilesOffline = true;
-  const note = $("mOffline");
-  if (note) note.hidden = false;
-  if (mMap && mView) paintPlacer();
-  if (window.__siteMap) paintMap(window.__siteMap);
+  SxMap.repaintAll();
 }
 
-const HALO = 'paint-order="stroke" stroke="#05080c" stroke-width="3" stroke-linejoin="round"';
+// ------------------------------------------------------------- drawing kit
+
+function offsetPoint(lat, lon, bearing, metres) {
+  const d = metres / R_EARTH, b = rad(bearing), p1 = rad(lat), l1 = rad(lon);
+  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
+  const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1),
+                             Math.cos(d) - Math.sin(p1) * Math.sin(p2));
+  return [deg(p2), (deg(l2) + 540) % 360 - 180];
+}
+
+// A 360-degree camera has a field of view but no one direction.
+function camMode(c) {
+  if (c.fov != null && c.fov >= 360) return "360";
+  return c.bearing != null && c.fov != null ? "fixed" : "none";
+}
+
+function coverageSvg(view, lat, lon, mode, bearing, fov, reach) {
+  const pts = [];
+  if (mode === "360") {
+    for (let i = 0; i <= 36; i++) pts.push(offsetPoint(lat, lon, i * 10, reach));
+  } else {
+    pts.push([lat, lon]);
+    for (let i = 0; i <= 16; i++) pts.push(offsetPoint(lat, lon, bearing - fov / 2 + fov * i / 16, reach));
+    pts.push([lat, lon]);
+  }
+  return pts.map(p => toScreen(view, p[0], p[1]).map(v => v.toFixed(1)).join(",")).join(" ");
+}
+
+const PIN_PATH = "M0,0 C-2.5,-6 -10,-11 -10,-19 A10,10 0 1 1 10,-19 C10,-11 2.5,-6 0,0 Z";
+const PIN_COLOUR = {camera: "#22c55e", alert: "#ef4444", offline: "#64748b", selected: "#22d3ee"};
+
+// A map pin with its tip on the camera, and a glyph saying what it is doing.
+function pinSvg(x, y, state, title, scale) {
+  const fill = PIN_COLOUR[state] || PIN_COLOUR.camera;
+  const camera = '<rect x="-5.6" y="-22.2" width="7.6" height="6.4" rx="1.3" fill="#fff"/>' +
+                 '<path d="M2.4,-20.6 L6,-22.6 L6,-15.4 L2.4,-17.4 Z" fill="#fff"/>';
+  let glyph = camera;
+  if (state === "alert")
+    glyph = '<path d="M0,-25.5 L6.2,-14.4 L-6.2,-14.4 Z" fill="#fff"/>' +
+            `<rect x="-0.85" y="-22.6" width="1.7" height="4.4" fill="${fill}"/>` +
+            `<rect x="-0.85" y="-17" width="1.7" height="1.7" fill="${fill}"/>`;
+  if (state === "offline")
+    glyph = camera + `<line x1="-6.5" y1="-14" x2="6.5" y2="-24.5" stroke="${fill}" stroke-width="3"/>` +
+            '<line x1="-6.5" y1="-14" x2="6.5" y2="-24.5" stroke="#fff" stroke-width="1.2"/>';
+  return `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)}) scale(${scale || 1})">
+      <title>${esc(title)}</title>
+      <ellipse cx="0" cy="0.6" rx="4.2" ry="1.7" fill="#000" opacity=".5"/>
+      <path d="${PIN_PATH}" fill="${fill}" stroke="#05080c" stroke-width="1.4"/>${glyph}</g>`;
+}
+
+// What each camera is doing, from the fleet status and the alerts on screen.
+function cameraStates() {
+  const status = window.__status || {};
+  const offline = new Set((status.skipped || []).map(s => s.camera_id));
+  (status.cameras || []).forEach(c => { if (!c.running) offline.add(c.camera_id); });
+  const alerting = new Set();
+  const now = Date.now();
+  (events || []).forEach(e => {
+    const at = new Date(e.timestamp).getTime();
+    if (isFinite(at) && now - at < 10 * 60 * 1000) alerting.add(e.camera_id);
+  });
+  return (id) => offline.has(id) ? "offline" : (alerting.has(id) ? "alert" : "camera");
+}
+
+function fenceSvg(view, fence, fontSize) {
+  const corners = (fence.polygon || []).map(p => toScreen(view, p[0], p[1]));
+  if (!corners.length) return "";
+  const pts = corners.map(c => c.map(v => v.toFixed(1)).join(",")).join(" ");
+  // Name inside the top-left of the area, clear of the scale bar at the bottom.
+  const x = Math.min(...corners.map(c => c[0])), y = Math.min(...corners.map(c => c[1]));
+  return `<polygon points="${pts}" fill="#ef44442e" stroke="#ef4444" stroke-width="2"
+            stroke-linejoin="round"/>
+    <text x="${(x + 7).toFixed(1)}" y="${(y + fontSize + 6).toFixed(1)}" fill="#fecaca"
+          font-size="${fontSize}" font-weight="600" letter-spacing="0.08em" ${HALO}>${esc(fence.name)}</text>`;
+}
+
+function metresLabel(m) {
+  return m >= 1000 ? (m / 1000).toFixed(m % 1000 ? 1 : 0) + " km" : Math.round(m) + " m";
+}
+
+function gridSvg(map) {
+  const mpp = metresPerPx(map.view.lat, map.view.zoom);
+  const px = (STEPS.find(s => mpp * map.w / s <= 9) || 2000000) / mpp;
+  let svg = "";
+  for (let x = map.w / 2 % px; x < map.w; x += px)
+    svg += `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${map.h}" stroke="#15202d"/>`;
+  for (let y = map.h / 2 % px; y < map.h; y += px)
+    svg += `<line x1="0" y1="${y.toFixed(1)}" x2="${map.w}" y2="${y.toFixed(1)}" stroke="#15202d"/>`;
+  return svg;
+}
+
+// North arrow, scale bar and the imagery credit.
+function mapChrome(map) {
+  const {w, h, view} = map;
+  const small = w < 600;
+  const mpp = metresPerPx(view.lat, view.zoom);
+  const step = STEPS.find(s => mpp * w / s <= (small ? 8 : 9)) || 2000000;
+  const px = step / mpp;
+  const base = map.base();
+  let svg = `<g transform="translate(${w - (small ? 20 : 30)},${small ? 22 : 30})">
+      <circle r="${small ? 12 : 16}" fill="#05080cb8" stroke="#2a3749"/>
+      <path d="${small ? "M0,-8 L4,3 L0,0.6 L-4,3 Z" : "M0,-11 L5.5,4.5 L0,1 L-5.5,4.5 Z"}" fill="#e8eef5"/>
+      <text y="${small ? 9 : 12.5}" fill="#e8eef5" font-size="${small ? 6 : 7.5}" text-anchor="middle">N</text></g>
+    <g transform="translate(${small ? 12 : 18},${h - (small ? 13 : 22)})">
+      <rect x="-6" y="${small ? -11 : -16}" width="${(px + (small ? 46 : 70)).toFixed(1)}"
+            height="${small ? 19 : 28}" rx="4" fill="#05080cc2"/>
+      <line x1="0" y1="0" x2="${px.toFixed(1)}" y2="0" stroke="#e8eef5" stroke-width="2"/>
+      <line x1="0" y1="-4" x2="0" y2="4" stroke="#e8eef5" stroke-width="2"/>
+      <line x1="${px.toFixed(1)}" y1="-4" x2="${px.toFixed(1)}" y2="4" stroke="#e8eef5" stroke-width="2"/>
+      <text x="${(px + 7).toFixed(1)}" y="${small ? 3 : 4}" fill="#e8eef5" font-size="${small ? 9 : 12}">${metresLabel(step)}</text></g>`;
+  if (base && base.attribution)
+    svg += `<text x="${w - 5}" y="${h - 5}" fill="#e2e8f0" font-size="${small ? 6 : 10}"
+             text-anchor="end" ${HALO}>${esc(base.attribution)}</text>`;
+  return svg;
+}
+
+// --------------------------------------------------------- the map widget
+
+const LAYERS_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5z"/>' +
+  '<path d="m2 13 10 5 10-5"/><path d="m2 17.5 10 5 10-5" opacity=".55"/></svg>';
+
+class SxMap {
+  constructor(box, {w, h, overlay, onClick, onMove}) {
+    this.box = box;
+    this.w = w;
+    this.h = h;
+    this.overlay = overlay;
+    this.onClick = onClick || null;
+    this.onMove = onMove || null;
+    this.site = null;
+    this.view = null;
+    this.drag = null;
+    this.panned = false;
+
+    box.classList.add("mapbox");
+    box.innerHTML =
+      `<svg viewBox="0 0 ${w} ${h}" role="img"><title>Map of camera positions</title>
+         <rect width="${w}" height="${h}" fill="#070d14"/>
+         <g class="maptiles"></g><g class="mapover"></g></svg>
+       <div class="mapctl">
+         <button type="button" data-act="in" title="Zoom in" aria-label="Zoom in">+</button>
+         <button type="button" data-act="out" title="Zoom out" aria-label="Zoom out">&minus;</button>
+         <button type="button" data-act="layers" title="Map layers" aria-label="Map layers">${LAYERS_ICON}</button>
+       </div>
+       <div class="layermenu" hidden></div>
+       <div class="mapnote" hidden>Map imagery could not load — probably no internet on
+         this network. Everything still works on the grid.</div>`;
+    this.svg = box.querySelector("svg");
+    this.tiles = box.querySelector(".maptiles");
+    this.over = box.querySelector(".mapover");
+    this.menu = box.querySelector(".layermenu");
+    this.note = box.querySelector(".mapnote");
+    this.listen();
+    SxMap.all.push(this);
+  }
+
+  base() { return window.__tilesOffline ? null : chosenBasemap(this.site); }
+
+  clamp(zoom) {
+    const base = this.base();
+    return Math.max(3, Math.min(base ? (base.max_zoom || 19) : 20, zoom));
+  }
+
+  point(ev) {
+    const box = this.svg.getBoundingClientRect();
+    return [(ev.clientX - box.left) / box.width * this.w, (ev.clientY - box.top) / box.height * this.h];
+  }
+
+  fit(points) {
+    const base = this.base();
+    this.view = fitView(points, this.w, this.h, base ? base.max_zoom : 18);
+  }
+
+  inView(lat, lon) {
+    if (!this.view) return false;
+    const [x, y] = toScreen(this.view, lat, lon);
+    return x > 20 && x < this.w - 20 && y > 20 && y < this.h - 20;
+  }
+
+  goTo(lat, lon, zoom) {
+    this.view.lat = lat;
+    this.view.lon = lon;
+    if (zoom != null) this.view.zoom = this.clamp(Math.max(this.view.zoom, zoom));
+  }
+
+  // Zoom keeping one spot on screen still - the cursor, or the middle.
+  zoomAt(delta, px, py) {
+    if (!this.view) return;
+    const [lat, lon] = fromScreen(this.view, px, py);
+    this.view.zoom = this.clamp(this.view.zoom + delta);
+    const [x, y] = toScreen(this.view, lat, lon);
+    const [cx, cy] = worldPx(this.view.lat, this.view.lon, this.view.zoom);
+    [this.view.lat, this.view.lon] = worldLatLon(cx + x - px, cy + y - py, this.view.zoom);
+    this.paint();
+  }
+
+  paint() {
+    if (!this.view) return;
+    syncTiles(this.tiles, this.view, this.base());
+    this.over.innerHTML = this.overlay(this);
+    this.note.hidden = !window.__tilesOffline;
+  }
+
+  toggleMenu() {
+    const current = chosenBasemap(this.site);
+    this.menu.innerHTML = ((this.site && this.site.basemaps) || []).map(b =>
+      `<button type="button" data-base="${esc(b.name)}" class="${current && current.name === b.name ? "on" : ""}">${esc(b.name)}</button>`
+    ).join("") + `<button type="button" data-base="grid" class="${current ? "" : "on"}">Grid only</button>`;
+    this.menu.hidden = !this.menu.hidden;
+  }
+
+  listen() {
+    const onControls = (ev) => ev.target.closest(".mapctl, .layermenu");
+
+    this.box.addEventListener("click", (ev) => {
+      const act = ev.target.closest("[data-act]");
+      if (act) {
+        if (act.dataset.act === "layers") this.toggleMenu();
+        else this.zoomAt(act.dataset.act === "in" ? 1 : -1, this.w / 2, this.h / 2);
+        return;
+      }
+      const choice = ev.target.closest("[data-base]");
+      if (choice) {
+        this.menu.hidden = true;
+        setBasemap(choice.dataset.base);
+        return;
+      }
+      if (onControls(ev)) return;
+      this.menu.hidden = true;
+      if (this.panned) { this.panned = false; return; }   // that was a drag, not a click
+      if (this.onClick && this.view) this.onClick(...fromScreen(this.view, ...this.point(ev)), ev);
+    });
+
+    this.box.addEventListener("mousedown", (ev) => {
+      if (!this.view || ev.button !== 0 || onControls(ev)) return;
+      this.drag = {x: ev.clientX, y: ev.clientY, zoom: this.view.zoom,
+                   world: worldPx(this.view.lat, this.view.lon, this.view.zoom), moved: false};
+    });
+
+    window.addEventListener("mousemove", (ev) => {
+      if (!this.drag || !this.view) return;
+      if (!this.drag.moved && Math.hypot(ev.clientX - this.drag.x, ev.clientY - this.drag.y) < 5) return;
+      if (!this.drag.moved) this.box.classList.add("dragging");
+      this.drag.moved = true;
+      if (this.drag.zoom !== this.view.zoom) {         // zoomed mid-drag: start again here
+        this.drag = {x: ev.clientX, y: ev.clientY, zoom: this.view.zoom,
+                     world: worldPx(this.view.lat, this.view.lon, this.view.zoom), moved: true};
+        return;
+      }
+      const box = this.svg.getBoundingClientRect();
+      const dx = (ev.clientX - this.drag.x) / box.width * this.w;
+      const dy = (ev.clientY - this.drag.y) / box.height * this.h;
+      [this.view.lat, this.view.lon] = worldLatLon(this.drag.world[0] - dx, this.drag.world[1] - dy,
+                                                   this.view.zoom);
+      this.paint();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (!this.drag) return;
+      this.panned = this.drag.moved;
+      this.drag = null;
+      this.box.classList.remove("dragging");
+    });
+
+    this.box.addEventListener("mousemove", (ev) => {
+      if (this.onMove && this.view && !onControls(ev))
+        this.onMove(...fromScreen(this.view, ...this.point(ev)));
+    });
+    this.box.addEventListener("mouseleave", () => { if (this.onMove) this.onMove(null, null); });
+
+    // The layer menu closes like any menu: a click elsewhere, or Escape.
+    document.addEventListener("click", (ev) => { if (!this.box.contains(ev.target)) this.menu.hidden = true; });
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") this.menu.hidden = true; });
+
+    this.box.addEventListener("wheel", (ev) => {
+      if (!this.view) return;
+      ev.preventDefault();
+      this.zoomAt(ev.deltaY < 0 ? 0.5 : -0.5, ...this.point(ev));
+    }, {passive: false});
+  }
+}
+SxMap.all = [];
+SxMap.repaintAll = () => SxMap.all.forEach(map => map.paint());
+
+// ------------------------------------------------------- dashboard overview
+
+let overview = null;
+let overviewFrame = "";
 
 function paintMap(m) {
-  const cams = (m && m.cameras) || [];
-  const fences = (m && m.geofences) || [];
+  if (!overview) overview = new SxMap($("mapWrap"), {w: 420, h: 270, overlay: overviewOverlay});
+  overview.site = m;
+  // Re-frame only when cameras or areas move, so a live poll never throws
+  // away where somebody has panned to.
+  const frame = JSON.stringify(sitePoints(m));
+  if (frame !== overviewFrame || !overview.view) {
+    overviewFrame = frame;
+    overview.fit(sitePoints(m));
+  }
   $("mapTag").textContent = (m && m.unplaced && m.unplaced.length)
     ? m.unplaced.length + " not placed" : "";
+  overview.paint();
+}
 
-  const W = 420, H = 260;
-  const pts = [];
-  cams.forEach(c => pts.push([c.lat, c.lon]));
-  fences.forEach(f => (f.polygon || []).forEach(p => pts.push(p)));
-  const base = window.__tilesOffline ? null : chosenBasemap(m);
-  const view = fitView(pts, W, H, base ? base.max_zoom : 18);
-  const at = (p) => toScreen(view, p[0], p[1]).map(v => v.toFixed(1)).join(",");
-
-  let svg = `<svg class="map" viewBox="0 0 ${W} ${H}" role="img">
-    <title>Camera positions and geofenced sectors</title>
-    <rect width="${W}" height="${H}" fill="#070d14"/>`;
-  tilesFor(view, base).forEach(tile => {
-    const size = (tile.size + 0.6).toFixed(1);
-    svg += `<image href="${esc(tile.url)}" x="${tile.x.toFixed(1)}" y="${tile.y.toFixed(1)}"
-             width="${size}" height="${size}" preserveAspectRatio="none"
-             onload="tileLoaded()" onerror="tileFailed()"/>`;
-  });
-
-  fences.forEach(f => {
-    svg += `<polygon points="${(f.polygon || []).map(at).join(" ")}" fill="#f43f5e1f"
-             stroke="#f43f5e" stroke-width="1.2" stroke-dasharray="5 4"/>`;
-    const p0 = (f.polygon || [])[0];
-    if (p0) {
-      const [x, y] = toScreen(view, p0[0], p0[1]);
-      svg += `<text x="${(x + 6).toFixed(1)}" y="${(y + 14).toFixed(1)}" fill="#fda4af"
-               font-size="9" letter-spacing="0.08em" ${HALO}>${esc(f.name)}</text>`;
-    }
-  });
-
+function overviewOverlay(map) {
+  const site = map.site || {}, view = map.view;
+  const stateOf = cameraStates();
+  const cams = site.cameras || [];
+  let svg = map.base() ? "" : gridSvg(map);
+  (site.geofences || []).forEach(f => { svg += fenceSvg(view, f, 9); });
+  const reach = Math.max(120, 16 * metresPerPx(view.lat, view.zoom));
   cams.forEach(c => {
-    if ((c.coverage || []).length)
-      svg += `<polygon points="${c.coverage.map(at).join(" ")}" fill="#22d3ee33"
-               stroke="#22d3ee" stroke-width="1"/>`;
+    const mode = camMode(c);
+    if (mode !== "none")
+      svg += `<polygon points="${coverageSvg(view, c.lat, c.lon, mode, c.bearing, c.fov, reach)}"
+               fill="#22d3ee26" stroke="#22d3ee99" stroke-width="1"/>`;
   });
-
   cams.forEach(c => {
     const [x, y] = toScreen(view, c.lat, c.lon);
-    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="#22d3ee"
-             stroke="#05080c" stroke-width="1.5"/>
-            <text x="${x.toFixed(1)}" y="${(y - 10).toFixed(1)}" fill="#e8eef5" font-size="9"
-             text-anchor="middle" ${HALO}>${esc(c.site || c.camera_id)}</text>`;
+    const state = stateOf(c.camera_id);
+    svg += pinSvg(x, y, state, c.camera_id + (c.site ? " · " + c.site : "") + " · " + state, 0.9);
   });
-
   if (!cams.length)
-    svg += `<text x="${W / 2}" y="${H - 22}" fill="#e8eef5" font-size="11" text-anchor="middle"
-             ${HALO}>no cameras placed yet — place them on the Map &amp; geofence page</text>`;
-  if (base && base.attribution)
-    svg += `<text x="${W - 4}" y="${H - 5}" fill="#cbd5e1" font-size="7" text-anchor="end"
-             ${HALO}>${esc(base.attribution)}</text>`;
-
-  svg += "</svg>";
-  $("mapWrap").innerHTML = svg + `
-    <div class="legend">
-      <span><i style="background:#22d3ee"></i>camera</span>
-      <span><i style="background:#22d3ee55"></i>where it points</span>
-      <span><i style="background:#f43f5e"></i>geofenced sector</span>
-    </div>`;
+    svg += `<text x="${map.w / 2}" y="${map.h / 2 + 40}" fill="#e8eef5" font-size="11"
+             text-anchor="middle" ${HALO}>no cameras placed yet — place them on the Map &amp; geofence page</text>`;
+  return svg + mapChrome(map);
 }
 
 /* ------------------------------------------------------------------ fleet */
 function paintFleet(status) {
   const cams = (status && status.cameras) || [];
   const skipped = (status && status.skipped) || [];
+  const editable = !!(status && status.fleet_editable);
+  document.querySelectorAll(".addcam-open").forEach(b => { b.hidden = !editable; });
   if (!cams.length && !skipped.length) {
     $("fleetWrap").innerHTML = '<div class="empty">no cameras</div>';
     return;
   }
+  const name = (c) => `<td>${esc(c.camera_id)}<span class="srcl">${esc(c.label || "")}</span></td>`;
+  const remove = (c) => editable
+    ? `<td class="rm"><button data-remove="${esc(c.camera_id)}" title="Remove ${esc(c.camera_id)}"
+         aria-label="Remove ${esc(c.camera_id)}">&times;</button></td>` : "<td></td>";
   const rows = cams.map(c => c.running || !c.error ? `
-    <tr><td>${esc(c.camera_id)}</td>
+    <tr>${name(c)}
       <td class="num">${(c.fps || 0).toFixed(1)}</td>
       <td class="num">${c.frames || 0}</td>
-      <td class="num">${c.alerts || 0}</td></tr>` : `
-    <tr><td>${esc(c.camera_id)}</td>
-      <td colspan="3" style="color:var(--critical)">${esc(c.error)}</td></tr>`)
+      <td class="num">${c.alerts || 0}</td>${remove(c)}</tr>` : `
+    <tr>${name(c)}
+      <td colspan="3" style="color:var(--critical)">${esc(c.error)}</td>${remove(c)}</tr>`)
     .concat(skipped.map(s => `
-    <tr><td>${esc(s.camera_id)}</td>
-      <td colspan="3" style="color:var(--critical)">${esc(s.reason || "offline")}</td></tr>`));
+    <tr>${name(s)}
+      <td colspan="3" style="color:var(--critical)">${esc(s.reason || "offline")}</td>${remove(s)}</tr>`));
   $("fleetWrap").innerHTML =
-    `<table><thead><tr><th>Camera</th><th>FPS</th><th>Frames</th><th>Alerts</th></tr></thead>
+    `<table><thead><tr><th>Camera</th><th>FPS</th><th>Frames</th><th>Alerts</th><th></th></tr></thead>
      <tbody>${rows.join("")}</tbody></table>`;
 }
+
+function fleetNote(text, bad) {
+  const note = $("fleetNote");
+  note.textContent = text;
+  note.className = "note on " + (bad ? "bad" : "ok");
+  if (!bad) setTimeout(() => note.classList.remove("on"), 6000);
+}
+
+async function send(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    headers: body ? {"Content-Type": "application/json"} : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let data = {};
+  try { data = await response.json(); } catch (err) { /* not JSON */ }
+  return {ok: response.ok, body: data};
+}
+
+// After the fleet changes, everything that lists cameras catches up at once
+// instead of on its next poll.
+async function fleetChanged() {
+  await poll();
+  try {
+    const m = await get("/api/map");
+    window.__siteMap = m;
+    paintMap(m);
+    paintCameras(window.__status, m);
+  } catch (err) { /* the next poll will do */ }
+}
+
+$("fleetWrap").addEventListener("click", async (ev) => {
+  const button = ev.target.closest("[data-remove]");
+  if (!button) return;
+  const id = button.dataset.remove;
+  if (!confirm("Remove " + id + " from the fleet?\n\nIt stops now and is deleted from the " +
+               "fleet file, map position included. Alerts it already raised are kept.")) return;
+  button.disabled = true;
+  try {
+    const r = await send("DELETE", "/api/cameras/" + encodeURIComponent(id));
+    if (!r.ok) { fleetNote("Not removed: " + (r.body.detail || "error"), true); button.disabled = false; return; }
+    if (mSel === id) { mSel = null; mDirty = false; }
+    await fleetChanged();
+    fleetNote(id + " removed from the fleet", false);
+  } catch (err) {
+    fleetNote("Could not reach the server - nothing was removed.", true);
+    button.disabled = false;
+  }
+});
+
+/* ------------------------------------------------------------ add camera */
+// A camera joins from here: a webcam, an IP camera, a wired CCTV camera on a
+// DVR, a phone app's stream, or the demo feed. The address is built from what
+// a person installing a camera actually knows - brand, IP, login, channel -
+// rather than an RTSP path nobody remembers.
+const BRAND_PATHS = {
+  hikvision: (ch, sub) => "/Streaming/Channels/" + (ch * 100 + (sub ? 2 : 1)),
+  dahua:     (ch, sub) => "/cam/realmonitor?channel=" + ch + "&subtype=" + (sub ? 1 : 0),
+  uniview:   (ch, sub) => "/unicast/c" + ch + "/s" + (sub ? 1 : 0) + "/live",
+  tapo:      (ch, sub) => "/stream" + (sub ? 2 : 1),
+};
+let acKind = "webcam";
+let acLastAdded = null;
+
+function acMask(source) {
+  return source.replace(/(\/\/[^/@:]*:)[^/@]*@/, "$1***@")
+               .replace(/([?&](?:password|pass|passwd|pwd|token|key|auth)=)[^&]*/gi, "$1***");
+}
+
+// The source the server will connect to. `reveal` false hides the password,
+// for showing on screen.
+function acSource(reveal) {
+  if (acKind === "demo") return "synthetic";
+  if (acKind === "webcam") return "webcam:" + $("acIndex").value;
+  if (acKind === "url") return $("acUrl").value.trim();
+  const host = $("acHost").value.trim().replace(/^rtsp:\/\//i, "").replace(/\/.*$/, "");
+  if (!host) return "";
+  const port = parseInt($("acPort").value, 10) || 554;
+  const user = $("acUser").value.trim(), pass = $("acPass").value;
+  const auth = user
+    ? encodeURIComponent(user) + (pass ? ":" + (reveal ? encodeURIComponent(pass) : "***") : "") + "@"
+    : "";
+  const brand = $("acBrand").value;
+  const channel = acKind === "dvr" ? Math.max(1, parseInt($("acChan").value, 10) || 1) : 1;
+  let path = brand === "custom"
+    ? $("acPath").value.trim()
+    : BRAND_PATHS[brand](channel, $("acStream").value === "sub");
+  if (path && !path.startsWith("/")) path = "/" + path;
+  return "rtsp://" + auth + host + ":" + port + path;
+}
+
+function acCameraIds() {
+  const status = window.__status || {};
+  return ((status.cameras || []).map(c => c.camera_id))
+    .concat((status.skipped || []).map(s => s.camera_id));
+}
+
+function acNextId() {
+  const taken = new Set(acCameraIds());
+  for (let n = 1; n < 1000; n++) {
+    const id = "CAM-" + String(n).padStart(2, "0");
+    if (!taken.has(id)) return id;
+  }
+  return "";
+}
+
+function acNote(text, bad) {
+  const note = $("acNote");
+  note.textContent = text;
+  note.className = "note on " + (bad ? "bad" : "ok");
+}
+
+function acPaint() {
+  document.querySelectorAll("#acKinds .kind").forEach(b =>
+    b.classList.toggle("on", b.dataset.kind === acKind));
+  document.querySelectorAll(".ackind").forEach(panel => {
+    panel.hidden = !panel.dataset.for.split(" ").includes(acKind);
+  });
+  const brand = $("acBrand").value, custom = brand === "custom";
+  $("acPathField").hidden = !custom;
+  $("acStreamField").hidden = custom;
+  $("acChanField").hidden = acKind !== "dvr" || custom || brand === "tapo";
+  $("acHostLabel").textContent = acKind === "dvr" ? "DVR / NVR IP address" : "Camera IP address";
+
+  const shown = acSource(false);
+  $("acSource").textContent = shown ? acMask(shown) : "—";
+  const login = (acKind === "ip" || acKind === "dvr") ? !!$("acPass").value
+    : acKind === "url" && acMask(shown) !== shown;
+  $("acCreds").hidden = !login;
+  const id = $("acId").value.trim();
+  $("acTest").disabled = !shown;
+  $("acAdd").disabled = !shown || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(id);
+}
+
+function acReset() {
+  $("acForm").hidden = false;
+  $("acDone").hidden = true;
+  $("acPreview").hidden = true;
+  $("acPreview").innerHTML = "";
+  $("acNote").className = "note";
+  $("acFound").innerHTML = "";
+  $("acPass").value = "";
+  $("acId").value = acNextId();
+  acPaint();
+}
+
+function openAddCamera() {
+  acReset();
+  $("addScrim").classList.add("on");
+  $("acId").focus();
+}
+
+function closeAddCamera() {
+  $("acPass").value = "";                 // a password does not linger in the page
+  $("addScrim").classList.remove("on");
+}
+
+document.querySelectorAll(".addcam-open").forEach(b => b.addEventListener("click", openAddCamera));
+$("acClose").addEventListener("click", closeAddCamera);
+$("acFinish").addEventListener("click", closeAddCamera);
+$("addScrim").addEventListener("click", (ev) => { if (ev.target === $("addScrim")) closeAddCamera(); });
+document.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && $("addScrim").classList.contains("on")) closeAddCamera();
+});
+
+$("acKinds").addEventListener("click", (ev) => {
+  const kind = ev.target.closest("[data-kind]");
+  if (!kind) return;
+  acKind = kind.dataset.kind;
+  $("acPreview").hidden = true;
+  $("acNote").className = "note";
+  acPaint();
+});
+
+["acIndex", "acBrand", "acHost", "acPort", "acUser", "acPass", "acChan", "acStream",
+ "acPath", "acUrl", "acId"].forEach(id => {
+  $(id).addEventListener("input", acPaint);
+  $(id).addEventListener("change", acPaint);
+});
+
+$("acFind").addEventListener("click", async () => {
+  $("acFind").disabled = true;
+  $("acFind").textContent = "Looking…";
+  $("acFound").innerHTML = "";
+  try {
+    const r = await send("POST", "/api/cameras/webcams");
+    const cams = (r.body && r.body.webcams) || [];
+    $("acFound").innerHTML = cams.length ? cams.map(w => w.in_use_by
+      ? `<button class="tab" disabled>Webcam ${w.index} · in use by ${esc(w.in_use_by)}</button>`
+      : `<button class="tab" data-webcam="${w.index}">Webcam ${w.index} · ${w.width}×${w.height}</button>`
+    ).join("") : '<span class="hint">No webcam answered. Check the USB cable, or close other apps using the camera.</span>';
+  } catch (err) {
+    $("acFound").innerHTML = '<span class="hint">Could not reach the server.</span>';
+  } finally {
+    $("acFind").disabled = false;
+    $("acFind").textContent = "Find webcams";
+  }
+});
+
+$("acFound").addEventListener("click", (ev) => {
+  const pick = ev.target.closest("[data-webcam]");
+  if (!pick) return;
+  $("acIndex").value = pick.dataset.webcam;
+  document.querySelectorAll("#acFound .tab").forEach(b => b.classList.toggle("on", b === pick));
+  acPaint();
+});
+
+$("acTest").addEventListener("click", async () => {
+  const source = acSource(true);
+  if (!source) return;
+  $("acTest").disabled = true;
+  $("acTest").textContent = "Testing…";
+  $("acPreview").hidden = true;
+  acNote("Connecting… a network camera can take up to 15 seconds.", false);
+  try {
+    const r = await send("POST", "/api/cameras/test", {source});
+    if (r.ok && r.body.ok) {
+      $("acPreview").innerHTML = `<img alt="What the camera sees" src="${r.body.preview}">`;
+      $("acPreview").hidden = false;
+      acNote("Connected — " + r.body.width + "×" + r.body.height + ". If this is the right view, add it.", false);
+    } else {
+      acNote("Did not connect: " + (r.body.reason || r.body.detail || "unknown error"), true);
+    }
+  } catch (err) {
+    acNote("Could not reach the server.", true);
+  } finally {
+    $("acTest").textContent = "Test connection";
+    acPaint();
+  }
+});
+
+$("acAdd").addEventListener("click", async () => {
+  const source = acSource(true), camera_id = $("acId").value.trim();
+  $("acAdd").disabled = true;
+  $("acTest").disabled = true;
+  acNote("Adding " + camera_id + "…", false);
+  try {
+    const r = await send("POST", "/api/cameras", {camera_id, source});
+    if (!r.ok) {
+      acNote("Not added: " + (r.body.detail || "error"), true);
+      acPaint();
+      return;
+    }
+    $("acPass").value = "";
+    acLastAdded = camera_id;
+    await fleetChanged();
+    $("acDoneNote").className = "note on " + (r.body.running ? "ok" : "bad");
+    $("acDoneNote").textContent = r.body.running
+      ? camera_id + " added and running (" + r.body.label + "). It is on the Live surveillance wall now."
+      : camera_id + " is saved, but it is offline: " + (r.body.reason || "not answering") +
+        ". It stays in the fleet and is tried again on the next restart.";
+    $("acForm").hidden = true;
+    $("acDone").hidden = false;
+  } catch (err) {
+    acNote("Could not reach the server - nothing was added.", true);
+    acPaint();
+  }
+});
+
+$("acAnother").addEventListener("click", acReset);
+$("acPlace").addEventListener("click", () => {
+  closeAddCamera();
+  if (acLastAdded && !mDirty) mSel = acLastAdded;
+  showView("mapPage");
+});
 
 /* ------------------------------------------------------------------ modal */
 function showEvent(id) {
@@ -1295,16 +2053,25 @@ function remember(list) {
   paintFeed();
 }
 
+// Stamped by the server when it sends the page.
+const UI_VERSION = "__UI_VERSION__";
+$("updReload").addEventListener("click", () => location.reload());
+
 async function poll() {
   try {
     const [status, summary, behaviours, incidents] = await Promise.all([
       get("/api/status"), get("/api/summary"),
       get("/api/behaviours"), get("/api/incidents"),
     ]);
+    // Not a silent reload: somebody may be halfway through placing a camera.
+    if (status.ui_version && status.ui_version !== UI_VERSION) $("updated").hidden = false;
     paintStats(status, summary, incidents);
     paintFleet(status);
     paintBehaviours(behaviours);
     paintCameras(status, window.__siteMap);
+    // Pins follow the fleet: a camera that stops or alerts changes colour.
+    window.__status = status;
+    if (overview) overview.paint();
   } catch (err) {
     // A poll that fails is not a reason to blank a dashboard somebody is
     // watching. The link indicator already says the connection is down.
@@ -1340,19 +2107,14 @@ function connect() {
 }
 
 /* --------------------------------------------------------- camera placer */
-// Satellite or street imagery when the browser can reach it, a metre grid when
-// it cannot. Either way positions, directions and saving work the same: a post
-// network with no internet loses the picture, not the tool.
-const R_EARTH = 6371008.8;
-const MW = 900, MH = 560;
-
+// The same map widget as the dashboard, with clicks that place a camera and
+// shift-clicks that aim it. Positions, directions and saving work the same on
+// imagery or on the grid: a post with no internet loses the picture, not the tool.
 let mMap = null;       // the last /api/map payload
 let mSel = null;       // selected camera id
 let mDraft = null;     // the position being edited, not yet saved
 let mDirty = false;
-let mView = null;      // {lat, lon, zoom, w, h}
-let mDrag = null;
-let mPanned = false;
+let placer = null;
 
 const okLat = (v) => typeof v === "number" && isFinite(v) && v >= -90 && v <= 90;
 const okLon = (v) => typeof v === "number" && isFinite(v) && v >= -180 && v <= 180;
@@ -1375,22 +2137,6 @@ function mCameras() {
   return [...new Set(ids)].sort();
 }
 
-function mBase() { return window.__tilesOffline ? null : chosenBasemap(mMap); }
-function mClampZoom(z) {
-  const base = mBase();
-  return Math.max(3, Math.min(base ? (base.max_zoom || 19) : 20, z));
-}
-
-// The same spherical offset the server uses for a wedge, so the preview and
-// the saved result agree.
-function mOffset(lat, lon, bearing, metres) {
-  const d = metres / R_EARTH, b = rad(bearing), p1 = rad(lat), l1 = rad(lon);
-  const p2 = Math.asin(Math.sin(p1) * Math.cos(d) + Math.cos(p1) * Math.sin(d) * Math.cos(b));
-  const l2 = l1 + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(p1),
-                             Math.cos(d) - Math.sin(p1) * Math.sin(p2));
-  return [deg(p2), (deg(l2) + 540) % 360 - 180];
-}
-
 function mBearingTo(lat1, lon1, lat2, lon2) {
   const p1 = rad(lat1), p2 = rad(lat2), dl = rad(lon2 - lon1);
   const y = Math.sin(dl) * Math.cos(p2);
@@ -1402,47 +2148,23 @@ function mCompass(b) {
   return ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(b / 45) % 8];
 }
 
-function mMetres(m) {
-  return m >= 1000 ? (m / 1000).toFixed(m % 1000 ? 1 : 0) + " km" : Math.round(m) + " m";
-}
-
-// A 360-degree camera has a field of view but no one direction.
-function camMode(c) {
-  if (c.fov != null && c.fov >= 360) return "360";
-  return c.bearing != null && c.fov != null ? "fixed" : "none";
-}
-
-function mCoverage(lat, lon, mode, bearing, fov, reach) {
-  const pts = [];
-  if (mode === "360") {
-    for (let i = 0; i <= 36; i++) pts.push(mOffset(lat, lon, i * 10, reach));
-  } else {
-    pts.push([lat, lon]);
-    for (let i = 0; i <= 16; i++) pts.push(mOffset(lat, lon, bearing - fov / 2 + fov * i / 16, reach));
-    pts.push([lat, lon]);
+function placerMap() {
+  if (!placer) {
+    placer = new SxMap($("mCanvas"), {
+      w: 900, h: 560, overlay: placerOverlay, onClick: placeAt,
+      onMove: (lat, lon) => {
+        $("mCursor").textContent = lat == null ? "" : lat.toFixed(6) + ", " + lon.toFixed(6);
+      },
+    });
   }
-  return pts.map(p => toScreen(mView, p[0], p[1]).map(v => v.toFixed(1)).join(",")).join(" ");
+  placer.site = mMap;
+  return placer;
 }
 
 function mFitView() {
-  const pts = [];
-  ((mMap && mMap.cameras) || []).forEach(c => pts.push([c.lat, c.lon]));
-  ((mMap && mMap.geofences) || []).forEach(f => (f.polygon || []).forEach(p => pts.push(p)));
+  const pts = sitePoints(mMap);
   if (hasPos(mDraft)) pts.push([mDraft.lat, mDraft.lon]);
-  const base = mBase();
-  mView = fitView(pts, MW, MH, base ? base.max_zoom : 18);
-}
-
-function mInView(lat, lon) {
-  if (!mView) return false;
-  const [x, y] = toScreen(mView, lat, lon);
-  return x > 20 && x < MW - 20 && y > 20 && y < MH - 20;
-}
-
-function mGoTo(lat, lon, zoom) {
-  mView.lat = lat;
-  mView.lon = lon;
-  mView.zoom = mClampZoom(Math.max(mView.zoom, zoom));
+  placer.fit(pts);
 }
 
 async function openPlacer() {
@@ -1452,22 +2174,14 @@ async function openPlacer() {
     mNote("Could not read the map from the server.", true);
     return;
   }
-  fillBaseSelect();
-  if (mDirty) { paintPlacer(); return; }          // never throw away an unsaved move
+  placerMap();
+  if (mDirty) { placer.paint(); return; }          // never throw away an unsaved move
   const ids = mCameras();
-  selectCamera(ids.includes(mSel) ? mSel : (ids[0] || null), !!mView);
+  selectCamera(ids.includes(mSel) ? mSel : (ids[0] || null), !!placer.view);
   if (!mMap.editable) {
     mNote("This server was started with a single --source, so positions cannot be " +
           "saved. Run python serve.py to use the fleet file.", true);
   }
-}
-
-function fillBaseSelect() {
-  const current = chosenBasemap(mMap);
-  $("mBase").innerHTML = ((mMap && mMap.basemaps) || [])
-    .map(b => '<option value="' + esc(b.name) + '">' + esc(b.name) + "</option>").join("") +
-    '<option value="grid">Grid only</option>';
-  $("mBase").value = current ? current.name : "grid";
 }
 
 function selectCamera(id, keepView) {
@@ -1484,11 +2198,11 @@ function selectCamera(id, keepView) {
        bearing: c.bearing != null ? c.bearing : 0,
        fov: c.fov != null && c.fov < 360 ? c.fov : 70, height: c.height_m}
     : {lat: null, lon: null, site: "", mode: "none", bearing: 0, fov: 70, height: null};
-  if (!keepView || !mView) mFitView();
-  else if (hasPos(mDraft) && !mInView(mDraft.lat, mDraft.lon)) mGoTo(mDraft.lat, mDraft.lon, 15);
+  if (!keepView || !placer.view) mFitView();
+  else if (hasPos(mDraft) && !placer.inView(mDraft.lat, mDraft.lon)) placer.goTo(mDraft.lat, mDraft.lon, 15);
   fillForm();
   paintList();
-  paintPlacer();
+  placer.paint();
 }
 
 function paintList() {
@@ -1529,170 +2243,54 @@ function mButtons() {
   $("mRemove").disabled = !(mSel && mPlaced(mSel) && editable);
 }
 
-function paintPlacer() {
-  if (!mMap || !mView) return;
-  mSyncTiles();
-  mPaintOver();
-}
+function placerOverlay(map) {
+  const view = map.view;
+  const stateOf = cameraStates();
+  let svg = map.base() ? "" : gridSvg(map);
+  (mMap.geofences || []).forEach(f => { svg += fenceSvg(view, f, 12); });
 
-// Tiles are kept and moved rather than redrawn, so dragging the map does not
-// flash every image back to black on each mouse move.
-function mSyncTiles() {
-  const layer = $("mTiles");
-  const keep = new Set();
-  const have = new Map([...layer.children].map(el => [el.getAttribute("data-key"), el]));
-  tilesFor(mView, mBase()).forEach(tile => {
-    let img = have.get(tile.key);
-    if (!img) {
-      img = document.createElementNS("http://www.w3.org/2000/svg", "image");
-      img.setAttribute("data-key", tile.key);
-      img.setAttribute("preserveAspectRatio", "none");
-      img.addEventListener("load", tileLoaded);
-      img.addEventListener("error", tileFailed);
-      img.setAttribute("href", tile.url);
-      layer.appendChild(img);
-    }
-    const size = (tile.size + 0.6).toFixed(1);
-    img.setAttribute("x", tile.x.toFixed(1));
-    img.setAttribute("y", tile.y.toFixed(1));
-    img.setAttribute("width", size);
-    img.setAttribute("height", size);
-    keep.add(tile.key);
-  });
-  have.forEach((el, key) => { if (!keep.has(key)) el.remove(); });
-}
+  // Big enough to see at any zoom, never less than the 120 m the server draws:
+  // it shows which way a camera points, not how far it can see.
+  const reach = Math.max(120, 28 * metresPerPx(view.lat, view.zoom));
+  const others = (mMap.cameras || []).filter(c => c.camera_id !== mSel);
 
-function mPaintOver() {
-  const mpp = metresPerPx(mView.lat, mView.zoom);
-  const span = mpp * MW;
-  const step = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
-                100000, 200000, 500000, 1000000].find(s => span / s <= 9) || 2000000;
-  const stepPx = step / mpp;
-  const base = mBase();
-  let svg = "";
-
-  if (!base) {
-    for (let x = MW / 2 % stepPx; x < MW; x += stepPx)
-      svg += `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${MH}" stroke="#15202d"/>`;
-    for (let y = MH / 2 % stepPx; y < MH; y += stepPx)
-      svg += `<line x1="0" y1="${y.toFixed(1)}" x2="${MW}" y2="${y.toFixed(1)}" stroke="#15202d"/>`;
-  }
-
-  (mMap.geofences || []).forEach(f => {
-    const pts = (f.polygon || []).map(p => toScreen(mView, p[0], p[1]).map(v => v.toFixed(1)).join(",")).join(" ");
-    svg += `<polygon points="${pts}" fill="#f43f5e1a" stroke="#f43f5e" stroke-width="1.6"
-             stroke-dasharray="7 5"/>`;
-    const p0 = (f.polygon || [])[0];
-    if (p0) {
-      const [x, y] = toScreen(mView, p0[0], p0[1]);
-      svg += `<text x="${(x + 7).toFixed(1)}" y="${(y + 17).toFixed(1)}" fill="#fda4af"
-               font-size="12" font-weight="600" letter-spacing="0.08em" ${HALO}>${esc(f.name)}</text>`;
-    }
-  });
-
-  // Big enough to see at any zoom, but never less than the 120 m the server
-  // draws: it shows which way a camera points, not how far it can see.
-  const reach = Math.max(120, 28 * mpp);
-
-  (mMap.cameras || []).forEach(c => {
-    if (c.camera_id === mSel) return;
+  others.forEach(c => {
     const mode = camMode(c);
     if (mode !== "none")
-      svg += `<polygon points="${mCoverage(c.lat, c.lon, mode, c.bearing, c.fov, reach)}"
+      svg += `<polygon points="${coverageSvg(view, c.lat, c.lon, mode, c.bearing, c.fov, reach)}"
                fill="#22d3ee26" stroke="#22d3ee99" stroke-width="1.2"/>`;
-    const [x, y] = toScreen(mView, c.lat, c.lon);
-    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5.5" fill="#22d3eecc"
-             stroke="#05080c" stroke-width="1.5"/>
-            <text x="${x.toFixed(1)}" y="${(y - 11).toFixed(1)}" fill="#e8eef5" font-size="12"
-             text-anchor="middle" ${HALO}>${esc(c.site || c.camera_id)}</text>`;
+  });
+  others.forEach(c => {
+    const [x, y] = toScreen(view, c.lat, c.lon);
+    const label = c.site || c.camera_id;
+    svg += pinSvg(x, y, stateOf(c.camera_id), c.camera_id + " · " + label, 1) +
+      `<text x="${x.toFixed(1)}" y="${(y - 34).toFixed(1)}" fill="#e8eef5" font-size="12"
+        text-anchor="middle" ${HALO}>${esc(label)}</text>`;
   });
 
   const saved = mPlaced(mSel);
   if (saved && mDirty && (saved.lat !== mDraft.lat || saved.lon !== mDraft.lon)) {
-    const [x, y] = toScreen(mView, saved.lat, saved.lon);
+    const [x, y] = toScreen(view, saved.lat, saved.lon);
     svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="none"
              stroke="#e8eef5" stroke-width="1.5" stroke-dasharray="3 3"/>`;
   }
 
   if (hasPos(mDraft)) {
     if (mDraft.mode !== "none")
-      svg += `<polygon points="${mCoverage(mDraft.lat, mDraft.lon, mDraft.mode, mDraft.bearing, mDraft.fov, reach)}"
-               fill="#22d3ee40" stroke="#22d3ee" stroke-width="1.8"/>`;
-    const [x, y] = toScreen(mView, mDraft.lat, mDraft.lon);
-    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="12" fill="none" stroke="#22d3ee"
-             stroke-width="2" ${mDirty ? 'stroke-dasharray="4 3"' : ""}/>
-            <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6.5" fill="#22d3ee"
-             stroke="#05080c" stroke-width="1.5"/>
-            <text x="${x.toFixed(1)}" y="${(y - 19).toFixed(1)}" fill="#ffffff" font-size="13"
-             font-weight="600" text-anchor="middle" ${HALO}>${esc(mDraft.site || mSel)}${mDirty ? " · unsaved" : ""}</text>`;
+      svg += `<polygon points="${coverageSvg(view, mDraft.lat, mDraft.lon, mDraft.mode, mDraft.bearing, mDraft.fov, reach)}"
+               fill="#22d3ee3d" stroke="#22d3ee" stroke-width="1.8"/>`;
+    const [x, y] = toScreen(view, mDraft.lat, mDraft.lon);
+    svg += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="14" ry="5.5" fill="none"
+             stroke="#22d3ee" stroke-width="2" ${mDirty ? 'stroke-dasharray="4 3"' : ""}/>` +
+      pinSvg(x, y, "selected", mSel, 1.2) +
+      `<text x="${x.toFixed(1)}" y="${(y - 41).toFixed(1)}" fill="#ffffff" font-size="13"
+        font-weight="600" text-anchor="middle" ${HALO}>${esc(mDraft.site || mSel)}${mDirty ? " · unsaved" : ""}</text>`;
   }
-
-  svg += `<g transform="translate(${MW - 34},34)">
-      <circle r="17" fill="#05080cb3"/>
-      <path d="M0,-12 L6,5 L0,1 L-6,5 Z" fill="#e8eef5"/>
-      <text y="14" fill="#e8eef5" font-size="8" text-anchor="middle">N</text></g>
-    <g transform="translate(18,${MH - 24})">
-      <rect x="-8" y="-17" width="${(stepPx + 74).toFixed(1)}" height="30" rx="5" fill="#05080cc7"/>
-      <line x1="0" y1="0" x2="${stepPx.toFixed(1)}" y2="0" stroke="#e8eef5" stroke-width="2"/>
-      <line x1="0" y1="-5" x2="0" y2="5" stroke="#e8eef5" stroke-width="2"/>
-      <line x1="${stepPx.toFixed(1)}" y1="-5" x2="${stepPx.toFixed(1)}" y2="5" stroke="#e8eef5" stroke-width="2"/>
-      <text x="${(stepPx + 9).toFixed(1)}" y="4" fill="#e8eef5" font-size="12">${mMetres(step)}</text></g>`;
-  if (base && base.attribution)
-    svg += `<text x="${MW - 7}" y="${MH - 8}" fill="#e2e8f0" font-size="10" text-anchor="end"
-             ${HALO}>${esc(base.attribution)}</text>`;
-
-  $("mOver").innerHTML = svg;
+  return svg + mapChrome(map);
 }
 
-function mSvgPoint(ev) {
-  const box = $("mSvg").getBoundingClientRect();
-  return [(ev.clientX - box.left) / box.width * MW, (ev.clientY - box.top) / box.height * MH];
-}
-
-function mEdited() {
-  mDirty = true;
-  fillForm();
-  paintPlacer();
-}
-
-$("mCanvas").addEventListener("mousedown", (ev) => {
-  if (!mView || ev.button !== 0) return;
-  mDrag = {x: ev.clientX, y: ev.clientY, zoom: mView.zoom,
-           world: worldPx(mView.lat, mView.lon, mView.zoom), moved: false};
-});
-
-window.addEventListener("mousemove", (ev) => {
-  if (!mDrag || !mView) return;
-  if (!mDrag.moved && Math.hypot(ev.clientX - mDrag.x, ev.clientY - mDrag.y) < 5) return;
-  mDrag.moved = true;
-  if (mDrag.zoom !== mView.zoom) {               // zoomed mid-drag: start again from here
-    mDrag = {x: ev.clientX, y: ev.clientY, zoom: mView.zoom,
-             world: worldPx(mView.lat, mView.lon, mView.zoom), moved: true};
-    return;
-  }
-  const box = $("mSvg").getBoundingClientRect();
-  const dx = (ev.clientX - mDrag.x) / box.width * MW;
-  const dy = (ev.clientY - mDrag.y) / box.height * MH;
-  [mView.lat, mView.lon] = worldLatLon(mDrag.world[0] - dx, mDrag.world[1] - dy, mView.zoom);
-  paintPlacer();
-});
-
-window.addEventListener("mouseup", () => {
-  if (mDrag) { mPanned = mDrag.moved; mDrag = null; }
-});
-
-$("mCanvas").addEventListener("mousemove", (ev) => {
-  if (!mView) return;
-  const [lat, lon] = fromScreen(mView, ...mSvgPoint(ev));
-  $("mCursor").textContent = lat.toFixed(6) + ", " + lon.toFixed(6);
-});
-
-$("mCanvas").addEventListener("mouseleave", () => { $("mCursor").textContent = ""; });
-
-$("mCanvas").addEventListener("click", (ev) => {
-  if (mPanned) { mPanned = false; return; }        // that was a drag, not a click
-  if (!mView || !mSel || !mDraft) return;
-  const [lat, lon] = fromScreen(mView, ...mSvgPoint(ev));
+function placeAt(lat, lon, ev) {
+  if (!mSel || !mDraft) return;
   if (ev.shiftKey) {
     if (!hasPos(mDraft)) { mNote("Place the camera first, then shift-click to point it.", true); return; }
     mDraft.bearing = Math.round(mBearingTo(mDraft.lat, mDraft.lon, lat, lon)) % 360;
@@ -1702,42 +2300,17 @@ $("mCanvas").addEventListener("click", (ev) => {
     mDraft.lon = +lon.toFixed(6);
   }
   mEdited();
-});
+}
 
-$("mCanvas").addEventListener("wheel", (ev) => {
-  if (!mView) return;
-  ev.preventDefault();
-  const point = mSvgPoint(ev);
-  const [lat, lon] = fromScreen(mView, ...point);
-  mView.zoom = mClampZoom(mView.zoom + (ev.deltaY < 0 ? 0.5 : -0.5));
-  // Keep the spot under the cursor still while everything else zooms.
-  const [x, y] = toScreen(mView, lat, lon);
-  const [cx, cy] = worldPx(mView.lat, mView.lon, mView.zoom);
-  [mView.lat, mView.lon] = worldLatLon(cx + x - point[0], cy + y - point[1], mView.zoom);
-  paintPlacer();
-}, {passive: false});
+function mEdited() {
+  mDirty = true;
+  fillForm();
+  placer.paint();
+}
 
-$("mZoomIn").addEventListener("click", () => {
-  if (mView) { mView.zoom = mClampZoom(Math.round(mView.zoom) + 1); paintPlacer(); }
-});
-$("mZoomOut").addEventListener("click", () => {
-  if (mView) { mView.zoom = mClampZoom(Math.round(mView.zoom) - 1); paintPlacer(); }
-});
-$("mFit").addEventListener("click", () => { if (mMap) { mFitView(); paintPlacer(); } });
+$("mFit").addEventListener("click", () => { if (placer && mMap) { mFitView(); placer.paint(); } });
 $("mIndia").addEventListener("click", () => {
-  if (mMap) { mView = fitView([], MW, MH, 18); paintPlacer(); }
-});
-
-$("mBase").addEventListener("change", (ev) => {
-  try { localStorage.setItem("sentinelx.basemap", ev.target.value); } catch (err) { /* ignore */ }
-  window.__tilesOffline = false;                  // a new choice deserves a new try
-  tilesOk = 0;
-  tilesBad = 0;
-  $("mOffline").hidden = true;
-  $("mTiles").innerHTML = "";
-  if (mView) mView.zoom = mClampZoom(mView.zoom);
-  paintPlacer();
-  if (window.__siteMap) paintMap(window.__siteMap);
+  if (placer) { placer.view = fitView([], placer.w, placer.h, 18); placer.paint(); }
 });
 
 $("mList").addEventListener("click", (ev) => {
@@ -1750,32 +2323,33 @@ $("mList").addEventListener("click", (ev) => {
 $("mPaste").addEventListener("input", (ev) => {
   const text = ev.target.value;
   const nums = text.match(/-?\d+(?:\.\d+)?/g);
-  if (!mDraft || !nums || nums.length < 2) return;
+  if (!mDraft || !placer || !nums || nums.length < 2) return;
   let lat = parseFloat(nums[0]), lon = parseFloat(nums[1]);
   if (/\bS\b|°\s*S/i.test(text)) lat = -Math.abs(lat);
   if (/\bW\b|°\s*W/i.test(text)) lon = -Math.abs(lon);
   if (!okLat(lat) || !okLon(lon)) { mNote("Those are not coordinates on Earth.", true); return; }
   mDraft.lat = +lat.toFixed(7);
   mDraft.lon = +lon.toFixed(7);
-  if (mView) mGoTo(lat, lon, 17);
+  if (placer.view) placer.goTo(lat, lon, 17);
   mEdited();
 });
 
 ["mLat", "mLon"].forEach(id => $(id).addEventListener("input", () => {
-  if (!mDraft) return;
+  if (!mDraft || !placer) return;
   const lat = parseFloat($("mLat").value), lon = parseFloat($("mLon").value);
   mDraft.lat = okLat(lat) ? lat : null;
   mDraft.lon = okLon(lon) ? lon : null;
-  if (mView && hasPos(mDraft) && !mInView(mDraft.lat, mDraft.lon)) mGoTo(mDraft.lat, mDraft.lon, 15);
+  if (placer.view && hasPos(mDraft) && !placer.inView(mDraft.lat, mDraft.lon))
+    placer.goTo(mDraft.lat, mDraft.lon, 15);
   mDirty = true;
   mButtons();
-  paintPlacer();
+  placer.paint();
 }));
 
 $("mSite").addEventListener("input", (ev) => {
-  if (!mDraft) return;
+  if (!mDraft || !placer) return;
   mDraft.site = ev.target.value;
-  mDirty = true; mButtons(); paintPlacer();
+  mDirty = true; mButtons(); placer.paint();
 });
 
 $("mMode").addEventListener("change", (ev) => {
@@ -1806,6 +2380,7 @@ $("mHeight").addEventListener("input", (ev) => {
 async function mRefresh(id) {
   mMap = await get("/api/map");
   window.__siteMap = mMap;
+  placer.site = mMap;
   paintMap(mMap);                                  // the dashboard overview too
   mDirty = false;
   selectCamera(id, true);

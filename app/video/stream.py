@@ -263,6 +263,16 @@ class StreamSource:
                 pass
             self._capture = None
 
+    def stop(self) -> None:
+        """Ask the feed to end, from another thread.
+
+        Only a flag: releasing the capture here could pull it out from under a
+        read in progress. A camera that is down sits in the reconnect loop and
+        never delivers the frame that would let its pipeline notice a stop, so
+        the loop checks this between attempts instead.
+        """
+        self._stop = True
+
     def release(self) -> None:
         self._stop = True
         self._release_capture()

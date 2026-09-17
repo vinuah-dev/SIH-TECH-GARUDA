@@ -21,18 +21,23 @@ here the hook happens to be a WebSocket broadcast.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import os
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from fastapi import (FastAPI, HTTPException, Query, Response, WebSocket,
+from fastapi import (FastAPI, HTTPException, Query, Request, Response, WebSocket,
                      WebSocketDisconnect)
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from .. import ui
+from ..camera_sources import (ProbeFailed, check_camera_id, describe_source,
+                              find_webcams, grab_frame, normalize_source,
+                              preview_data_url, redact_source, webcam_index)
 from ..config import SurveillanceConfig
 from ..runner import (CameraSpec, MultiCameraRunner, load_camera_specs,
                       load_site_map)
@@ -116,14 +121,17 @@ class FleetService:
 
     @property
     def running(self) -> bool:
-        if self.thread is not None:
-            return self.thread.is_alive()
         # In view mode the wait loop lives on the caller's thread, so liveness
-        # is whatever the cameras themselves say.
-        return bool(self.runner and any(w.alive for w in self.runner.workers))
+        # is whatever the cameras themselves say - and a camera added from the
+        # dashboard after the wait loop ended still counts.
+        cameras = bool(self.runner and any(w.alive for w in self.runner.workers))
+        if self.thread is not None:
+            return self.thread.is_alive() or cameras
+        return cameras
 
     def status(self) -> dict:
         cameras = self.runner.status() if self.runner else []
+        sources = {spec.camera_id: spec.source for spec in self.specs}
         return {
             "running": self.running,
             "started_at": self.started_at.isoformat(timespec="seconds")
@@ -131,9 +139,13 @@ class FleetService:
             else None,
             "cameras": cameras,
             "skipped": [
-                {"camera_id": cid, "reason": reason}
+                {"camera_id": cid, "reason": reason,
+                 "source": redact_source(sources.get(cid, "")),
+                 "label": describe_source(sources.get(cid, ""))}
                 for cid, reason in (self.runner.skipped if self.runner else [])
             ],
+            # Whether cameras can be added, removed and placed from the dashboard.
+            "fleet_editable": self.fleet_path is not None,
             "model_sharing": "shared" if (self.runner and self.runner.shared) else "per camera",
             "total_alerts": sum(c["alerts"] for c in cameras),
             "dashboards_connected": self.hub.client_count,
@@ -170,18 +182,37 @@ def create_app(
 
     # -------------------------------------------------------------- dashboard
 
+    page_seen = {"mtime": None, "version": ""}
+
+    def ui_version() -> str:
+        """Short hash of the dashboard page, re-read only when the file changes."""
+        page = STATIC / "index.html"
+        try:
+            mtime = page.stat().st_mtime_ns
+        except OSError:
+            return ""
+        if mtime != page_seen["mtime"]:
+            page_seen["version"] = hashlib.sha256(page.read_bytes()).hexdigest()[:12]
+            page_seen["mtime"] = mtime
+        return page_seen["version"]
+
     @app.get("/", response_class=HTMLResponse)
-    async def dashboard() -> str:
+    async def dashboard() -> HTMLResponse:
         page = STATIC / "index.html"
         if not page.exists():
-            return "<h1>SENTINEL-X</h1><p>Dashboard asset missing.</p>"
-        return page.read_text(encoding="utf-8")
+            return HTMLResponse("<h1>SENTINEL-X</h1><p>Dashboard asset missing.</p>")
+        # Never cached, and stamped with the version it is: a reload always
+        # gets the current page, and an open tab can tell when it is behind.
+        return HTMLResponse(
+            page.read_text(encoding="utf-8").replace("__UI_VERSION__", ui_version()),
+            headers={"Cache-Control": "no-store"},
+        )
 
     # -------------------------------------------------------------------- api
 
     @app.get("/api/status")
     async def status() -> dict:
-        return service.status()
+        return {**service.status(), "ui_version": ui_version()}
 
     @app.get("/api/summary")
     async def summary() -> dict:
@@ -474,18 +505,13 @@ def create_app(
             )
         return service.fleet_path
 
-    def _write_location(camera_id: str, location: CameraLocation | None) -> Path:
-        """Set one camera's `location` in the fleet file, and touch nothing else.
-
-        Only the location of a camera already in the file is written. A request
-        cannot add a camera, remove one, or change where a camera's video comes
-        from - and that last one matters most: an endpoint that could rewrite
-        `source` would let anybody who reaches the port point this server at
-        any URL or file they liked.
+    def _edit_fleet(change) -> Path:
+        """Apply one change to the fleet file, all or nothing.
 
         The new file is written beside the old one and loaded back exactly as
         the server loads it at startup before it replaces anything, so a save
-        that would stop the fleet starting next time never lands.
+        that would stop the fleet starting next time never lands. Everything
+        the change does not touch - notes, geofences, basemaps - is kept.
         """
         path = _fleet_file()
         with service.fleet_lock:
@@ -494,26 +520,7 @@ def create_app(
             except (OSError, json.JSONDecodeError) as exc:
                 raise HTTPException(status_code=500, detail=f"{path}: {exc}") from exc
 
-            entry = next(
-                (c for c in raw.get("cameras", [])
-                 if str(c.get("camera_id")) == camera_id),
-                None,
-            )
-            if entry is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"{camera_id} is running but is no longer in {path} - "
-                           f"the file was edited after the server started. "
-                           f"Restart it, then place the camera again.",
-                )
-
-            if location is None:
-                entry.pop("location", None)
-            else:
-                entry["location"] = {
-                    key: value for key, value in location.to_dict().items()
-                    if value not in (None, "")
-                }
+            change(raw)
 
             staged = path.with_name(path.name + ".saving")
             try:
@@ -528,6 +535,37 @@ def create_app(
                     status_code=500, detail=f"{path} was left unchanged: {exc}",
                 ) from exc
         return path
+
+    def _write_location(camera_id: str, location: CameraLocation | None) -> Path:
+        """Set one camera's `location` in the fleet file, and touch nothing else.
+
+        Only the location of a camera already in the file is written. Placing a
+        camera cannot add one, remove one, or change where its video comes from:
+        that is the add-camera endpoint's job alone, and it checks the source
+        it is given far more strictly than a map click needs to be.
+        """
+        def place(raw: dict) -> None:
+            entry = next(
+                (c for c in raw.get("cameras", [])
+                 if str(c.get("camera_id")) == camera_id),
+                None,
+            )
+            if entry is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"{camera_id} is running but is no longer in "
+                           f"{service.fleet_path} - the file was edited after the "
+                           f"server started. Restart it, then place the camera again.",
+                )
+            if location is None:
+                entry.pop("location", None)
+            else:
+                entry["location"] = {
+                    key: value for key, value in location.to_dict().items()
+                    if value not in (None, "")
+                }
+
+        return _edit_fleet(place)
 
     @app.put("/api/map/cameras/{camera_id}")
     async def place_camera(camera_id: str, payload: dict) -> dict:
@@ -581,6 +619,165 @@ def create_app(
         spec.location = None
         service.site_map.cameras.pop(camera_id, None)
         return {"camera_id": camera_id, "placed": False, "saved": True, "path": str(path)}
+
+    # ------------------------------------------------------ adding cameras
+
+    def _from_this_dashboard(request: Request, body: bool = True) -> None:
+        """Refuse a write that some other website's page sent through a browser.
+
+        The API has no login, and these endpoints make the server connect to
+        an address it is given. A page on another site cannot read what comes
+        back, but it could still tell an operator's browser to add a camera
+        pointing wherever it liked. Browsers name the page a request came from,
+        and a request from this dashboard names this server.
+        """
+        origin = request.headers.get("origin")
+        host = request.headers.get("host", "")
+        if (origin is not None and urlsplit(origin).netloc != host) or \
+                request.headers.get("sec-fetch-site") == "cross-site":
+            raise HTTPException(status_code=403,
+                                detail="refused: this request came from another website")
+        if body:
+            kind = request.headers.get("content-type", "").split(";")[0].strip().lower()
+            if kind != "application/json":
+                raise HTTPException(status_code=415, detail="send the camera as JSON")
+
+    def _webcam_owner(source: str) -> str | None:
+        """Which configured camera already uses this webcam, if any."""
+        index = webcam_index(source)
+        if index is None:
+            return None
+        return next((spec.camera_id for spec in service.specs
+                     if webcam_index(spec.source) == index), None)
+
+    @app.post("/api/cameras/test")
+    async def test_camera(request: Request, payload: dict) -> dict:
+        """Open a camera, read one picture and close it - before it joins.
+
+        Answers ok false with a reason rather than an error status: a camera
+        that does not connect is the normal result of a typo, not a fault.
+        """
+        _from_this_dashboard(request)
+        try:
+            source = normalize_source(payload.get("source"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        owner = _webcam_owner(source)
+        if owner:
+            return {"ok": False,
+                    "reason": f"webcam {webcam_index(source)} is already in use by {owner}"}
+        try:
+            image = await asyncio.wait_for(asyncio.to_thread(grab_frame, source), timeout=25)
+        except ProbeFailed as exc:
+            return {"ok": False, "reason": str(exc)}
+        except asyncio.TimeoutError:
+            return {"ok": False, "reason": "the camera did not answer within 25 seconds"}
+        except Exception as exc:  # noqa: BLE001 - OpenCV fails in many shapes
+            return {"ok": False, "reason": f"could not open it ({type(exc).__name__})"}
+        height, width = image.shape[:2]
+        return {"ok": True, "width": width, "height": height,
+                "label": describe_source(source), "preview": preview_data_url(image)}
+
+    @app.post("/api/cameras/webcams")
+    async def list_webcams(request: Request) -> dict:
+        """The webcam numbers with a camera behind them. Turns each on briefly."""
+        _from_this_dashboard(request, body=False)
+        busy = {webcam_index(spec.source): spec.camera_id for spec in service.specs
+                if webcam_index(spec.source) is not None}
+        return {"webcams": await asyncio.to_thread(find_webcams, busy)}
+
+    @app.post("/api/cameras")
+    async def add_camera(request: Request, payload: dict) -> dict:
+        """Add a camera to the fleet from the dashboard, and start it at once.
+
+        Saved into the fleet file the server started with, so it is still there
+        after a restart. Only a camera name and a source are read, and the
+        source must be a webcam number, a camera's rtsp/http address or the
+        demo feed - never a file path.
+        """
+        _from_this_dashboard(request)
+        try:
+            camera_id = check_camera_id(payload.get("camera_id"))
+            source = normalize_source(payload.get("source"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        _fleet_file()
+        if any(spec.camera_id == camera_id for spec in service.specs):
+            raise HTTPException(status_code=409,
+                                detail=f"there is already a camera called {camera_id}")
+        owner = _webcam_owner(source)
+        if owner:
+            raise HTTPException(
+                status_code=409,
+                detail=f"webcam {webcam_index(source)} is already used by {owner}",
+            )
+
+        entry = {"camera_id": camera_id, "source": source}
+
+        def append(raw: dict) -> None:
+            cameras = raw.setdefault("cameras", [])
+            if any(str(c.get("camera_id")) == camera_id for c in cameras):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"{camera_id} is already in {service.fleet_path} - restart "
+                           f"the server to load it",
+                )
+            cameras.append(entry)
+
+        path = _edit_fleet(append)
+        spec = CameraSpec.from_dict(entry)
+        service.specs.append(spec)
+        running, reason = False, "the fleet is not running"
+        if service.runner is not None:
+            try:
+                running, reason = await asyncio.to_thread(service.runner.add_camera, spec)
+            except ValueError as exc:
+                reason = str(exc)
+        return {
+            "camera_id": camera_id,
+            "label": describe_source(source),
+            "source": redact_source(source),
+            "saved": True,
+            "running": running,
+            "reason": reason or None,
+            "path": str(path),
+        }
+
+    @app.delete("/api/cameras/{camera_id}")
+    async def remove_camera(camera_id: str, request: Request) -> dict:
+        """Stop a camera and delete it from the fleet file, map position included.
+
+        Alerts and evidence it already produced stay: they are the record.
+        """
+        _from_this_dashboard(request, body=False)
+        _spec(camera_id)
+        _fleet_file()
+        if len(service.specs) <= 1:
+            raise HTTPException(
+                status_code=409,
+                detail="the fleet needs at least one camera - add the new one first, "
+                       "then remove this one",
+            )
+
+        def drop(raw: dict) -> None:
+            cameras = raw.get("cameras", [])
+            kept = [c for c in cameras if str(c.get("camera_id")) != camera_id]
+            if len(kept) == len(cameras):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"{camera_id} is running but is not in {service.fleet_path} "
+                           f"- the file was edited after the server started",
+                )
+            raw["cameras"] = kept
+
+        path = _edit_fleet(drop)
+        service.specs[:] = [spec for spec in service.specs if spec.camera_id != camera_id]
+        service.site_map.cameras.pop(camera_id, None)
+        stopped = False
+        if service.runner is not None:
+            stopped = await asyncio.to_thread(service.runner.remove_camera, camera_id)
+        return {"camera_id": camera_id, "removed": True, "was_running": stopped,
+                "saved": True, "path": str(path)}
 
     @app.get("/api/events/{event_id}")
     async def event(event_id: str) -> dict:

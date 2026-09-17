@@ -140,6 +140,7 @@ class SurveillancePipeline:
         # waitKey deadlock the process, so a fleet displays on its main thread.
         self.frame_sink = frame_sink
         self._stop_requested = False
+        self._source = None
         self._zone_of_track: dict[int, tuple[str, tuple[str, ...]]] = {}
         self._source_health = None
         self._stream_time = 0.0
@@ -492,6 +493,7 @@ class SurveillancePipeline:
             synthetic_frames=self.config.synthetic_frames,
             reconnect_attempts=self.config.reconnect_attempts,
         )
+        self._source = source
         self._source_health = getattr(source, "health", None)
         try:
             if self.detector is None:
@@ -512,6 +514,11 @@ class SurveillancePipeline:
     def request_stop(self) -> None:
         """Ask the run loop to finish after the current frame."""
         self._stop_requested = True
+        # A network camera that is down never delivers a next frame, so the
+        # flag above would never be read; tell the source itself to give up.
+        stop = getattr(self._source, "stop", None)
+        if callable(stop):
+            stop()
 
     def _loop(self, source) -> None:
         import cv2

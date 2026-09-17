@@ -288,8 +288,32 @@ def test_the_map_page_carries_the_camera_placer(client):
     page = client.get("/").text
     assert 'id="view-mapPage"' in page
     for hook in ("mCanvas", "mSave", "mRemove", "mPaste", "/api/map/cameras/",
-                 "mBase", "basemaps", "mMode"):
+                 "basemaps", "mMode"):
         assert hook in page, f"the map page never uses {hook}"
+
+
+def test_both_maps_share_one_widget_with_controls_on_the_map():
+    """Zoom and layer buttons sit on the map itself, the same on the dashboard and the map page."""
+    page = client_page()
+    assert "class SxMap" in page
+    for hook in ('data-act="in"', 'data-act="out"', 'data-act="layers"', "Grid only"):
+        assert hook in page, f"the map controls lost {hook}"
+    assert page.count("new SxMap(") == 2, "dashboard overview and camera placer"
+
+
+def test_map_pins_say_what_each_camera_is_doing():
+    page = client_page()
+    for state in ('camera: "#22c55e"', 'alert: "#ef4444"', 'offline: "#64748b"'):
+        assert state in page
+    # The geofence is a solid red line, not a dashed hint.
+    fence = page[page.index("function fenceSvg"):page.index("function metresLabel")]
+    assert 'stroke="#ef4444"' in fence and "dasharray" not in fence
+
+
+def client_page():
+    from pathlib import Path
+
+    return Path("app/server/static/index.html").read_text(encoding="utf-8")
 
 
 def test_serve_hands_the_fleet_file_to_the_server():

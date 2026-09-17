@@ -35,6 +35,19 @@ def test_the_dashboard_is_served(client):
     assert "SENTINEL-X" in response.text
 
 
+def test_the_dashboard_is_never_served_from_cache(client):
+    """A browser holding an old page shows the old map however often it polls."""
+    assert "no-store" in client.get("/").headers["cache-control"]
+
+
+def test_an_open_tab_can_tell_the_server_has_a_newer_dashboard(client):
+    page = client.get("/").text
+    version = client.get("/api/status").json()["ui_version"]
+    assert len(version) == 12
+    assert f'const UI_VERSION = "{version}";' in page
+    assert "__UI_VERSION__" not in page
+
+
 def test_status_reports_the_fleet(client):
     payload = client.get("/api/status").json()
     assert payload["running"] in (True, False)
