@@ -64,8 +64,8 @@ or macOS use `python3` where it says `python`.
 ### 2. Get the code and install it
 
 ```bash
-git clone https://github.com/vinuah-dev/SIH.git
-cd SIH
+git clone https://github.com/vinuah-dev/SIH-TECH-GARUDA.git
+cd SIH-TECH-GARUDA
 ```
 
 Create a virtual environment so the packages stay out of your system Python:
