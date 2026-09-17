@@ -3,7 +3,7 @@
   "_comment": "Drawn in the SENTINEL-X dashboard.",
   "zones": [
     {
-      "name": "RES",
+      "name": "CUBOARD",
       "kind": "RESTRICTED",
       "base_risk": 60,
       "description": "Drawn in the dashboard.",
@@ -13,20 +13,20 @@
       ],
       "polygon": [
         [
-          0.6326,
-          0.3092
+          0.0002,
+          0.2845
         ],
         [
-          0.9618,
-          0.2951
+          0.119,
+          0.4017
         ],
         [
-          0.9772,
-          0.9471
+          0.0958,
+          0.9941
         ],
         [
-          0.6557,
-          0.9715
+          0.0031,
+          0.9915
         ]
       ]
     }

@@ -10,8 +10,8 @@
       "location": {
         "lat": 32.837368,
         "lon": 74.288593,
-        "bearing": 359.0,
-        "fov": 173.0,
+        "bearing": 224.0,
+        "fov": 143.0,
         "height_m": 1.2,
         "site": "Gate A"
       }
@@ -21,7 +21,12 @@
       "source": "http://100.66.98.0:8080/video",
       "zones": "config/zones-phone.json",
       "_note": "IP Webcam app on the phone - update the IP if it changes",
-      "reconnect_attempts": 5
+      "reconnect_attempts": 5,
+      "location": {
+        "lat": 31.487328,
+        "lon": 72.867641,
+        "fov": 360.0
+      }
     }
   ],
   "_geofence_note": "Areas drawn on the map, in lat/lon. These are NOT the virtual fences in config/zones-*.json - those live in frame coordinates and cannot be placed on a map without a surveyed homography per camera. Nothing in the running pipeline tests detections against these yet; they group cameras by sector and give the map areas to draw.",
